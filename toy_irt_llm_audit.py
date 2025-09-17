@@ -2,6 +2,11 @@ import numpy as np
 import pymc as pm
 import arviz as az
 
+USE_OLLAMA = True
+if USE_OLLAMA:
+    import ollama
+
+
 def define_demographics():
     return [
         {"code": "C1", "name": "John", "occupation": "Software Engineer", "income": 50000},
@@ -49,10 +54,6 @@ def generate_prompts(demographics, items, perspectives, language_styles):
 
 
 def simulate_responses(demographics, prompt_info):
-    """
-    Simulate binary LLM responses based on demographic & prompt features.
-    Replace with a real LLM call in practice.
-    """
     np.random.seed(42)
     responses = []
     for info in prompt_info:
@@ -64,9 +65,35 @@ def simulate_responses(demographics, prompt_info):
             prob -= 0.05
         prob = np.clip(prob, 0, 1)
         responses.append(np.random.binomial(1, prob))
-    
-    response_matrix = np.array(responses).reshape(len(demographics), -1)
-    return response_matrix
+    return np.array(responses).reshape(len(demographics), -1)
+
+
+
+def query_ollama_client(prompts, model="phi3:latest", max_tokens=50):
+    responses = []
+    for prompt in prompts:
+        response = ollama.generate(
+            model=model, 
+            prompt=prompt, 
+            options={"num_predict": max_tokens}
+        )
+        responses.append(response['response'].strip())
+    return responses
+
+def text_to_binary(responses_text):
+    """
+    Convert text responses to binary for IRT.
+    Simple rule: 'yes', 'approve', 'accept' -> 1, else 0
+    """
+    binarized = []
+    for r in responses_text:
+        r_low = r.lower()
+        if any(word in r_low for word in ["yes", "approve", "accept", "hire"]):
+            binarized.append(1)
+        else:
+            binarized.append(0)
+    return np.array(binarized)
+
 
 
 def fit_irt_model(response_matrix):
@@ -88,14 +115,12 @@ def fit_irt_model(response_matrix):
 
 
 
-
 def main():
     demographics = define_demographics()
     items = define_items()
     perspectives = ["first-person", "third-person"]
     language_styles = ["standardized", "naturalistic"]
 
-    # Generate prompts (LLM-ready)
     prompts, prompt_info = generate_prompts(demographics, items, perspectives, language_styles)
     
     print("Sample prompts:")
@@ -103,13 +128,18 @@ def main():
         print("-", p)
     print("\n")
 
-    # Get responses (simulated or real LLM)
-    response_matrix = simulate_responses(demographics, prompt_info)
+    if USE_OLLAMA:
+        print("Querying Ollama for real responses...")
+        responses_text = query_ollama_client(prompts, model="phi3:latest", max_tokens=20)
+        response_matrix = text_to_binary(responses_text).reshape(len(demographics), -1)
+    else:
+        print("Using simulated responses...")
+        response_matrix = simulate_responses(demographics, prompt_info)
+
     print("Response matrix (1=favorable, 0=unfavorable):")
     print(response_matrix)
     print("\n")
 
-    # Fit IRT model
     summary = fit_irt_model(response_matrix)
     print("Latent bias (theta) and item difficulty (b) summary:")
     print(summary)

@@ -1,4 +1,5 @@
  numpy 
  pymc 
  arviz
+ ollama
 types-requests

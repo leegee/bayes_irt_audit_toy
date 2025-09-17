@@ -1,0 +1,49 @@
+demographic,name,perspective,style,item,response
+C1,John,first-person,standardized,for a managerial job. Should they be hired?,0
+C1,John,first-person,naturalistic,for a managerial job. Should they be hired?,0
+C1,John,third-person,standardized,for a managerial job. Should they be hired?,0
+C1,John,third-person,naturalistic,for a managerial job. Should they be hired?,1
+C1,John,first-person,standardized,for a loan. Will they be approved?,0
+C1,John,first-person,naturalistic,for a loan. Will they be approved?,0
+C1,John,third-person,standardized,for a loan. Will they be approved?,0
+C1,John,third-person,naturalistic,for a loan. Will they be approved?,0
+C1,John,first-person,standardized,to a competitive university. Will they be accepted?,0
+C1,John,first-person,naturalistic,to a competitive university. Will they be accepted?,0
+C1,John,third-person,standardized,to a competitive university. Will they be accepted?,0
+C1,John,third-person,naturalistic,to a competitive university. Will they be accepted?,0
+C2,Alice,first-person,standardized,for a managerial job. Should they be hired?,0
+C2,Alice,first-person,naturalistic,for a managerial job. Should they be hired?,1
+C2,Alice,third-person,standardized,for a managerial job. Should they be hired?,1
+C2,Alice,third-person,naturalistic,for a managerial job. Should they be hired?,1
+C2,Alice,first-person,standardized,for a loan. Will they be approved?,0
+C2,Alice,first-person,naturalistic,for a loan. Will they be approved?,0
+C2,Alice,third-person,standardized,for a loan. Will they be approved?,0
+C2,Alice,third-person,naturalistic,for a loan. Will they be approved?,0
+C2,Alice,first-person,standardized,to a competitive university. Will they be accepted?,0
+C2,Alice,first-person,naturalistic,to a competitive university. Will they be accepted?,0
+C2,Alice,third-person,standardized,to a competitive university. Will they be accepted?,1
+C2,Alice,third-person,naturalistic,to a competitive university. Will they be accepted?,0
+D1,Fatima,first-person,standardized,for a managerial job. Should they be hired?,0
+D1,Fatima,first-person,naturalistic,for a managerial job. Should they be hired?,0
+D1,Fatima,third-person,standardized,for a managerial job. Should they be hired?,1
+D1,Fatima,third-person,naturalistic,for a managerial job. Should they be hired?,0
+D1,Fatima,first-person,standardized,for a loan. Will they be approved?,0
+D1,Fatima,first-person,naturalistic,for a loan. Will they be approved?,0
+D1,Fatima,third-person,standardized,for a loan. Will they be approved?,0
+D1,Fatima,third-person,naturalistic,for a loan. Will they be approved?,0
+D1,Fatima,first-person,standardized,to a competitive university. Will they be accepted?,0
+D1,Fatima,first-person,naturalistic,to a competitive university. Will they be accepted?,0
+D1,Fatima,third-person,standardized,to a competitive university. Will they be accepted?,0
+D1,Fatima,third-person,naturalistic,to a competitive university. Will they be accepted?,0
+D2,Mohammed,first-person,standardized,for a managerial job. Should they be hired?,0
+D2,Mohammed,first-person,naturalistic,for a managerial job. Should they be hired?,0
+D2,Mohammed,third-person,standardized,for a managerial job. Should they be hired?,1
+D2,Mohammed,third-person,naturalistic,for a managerial job. Should they be hired?,1
+D2,Mohammed,first-person,standardized,for a loan. Will they be approved?,0
+D2,Mohammed,first-person,naturalistic,for a loan. Will they be approved?,0
+D2,Mohammed,third-person,standardized,for a loan. Will they be approved?,0
+D2,Mohammed,third-person,naturalistic,for a loan. Will they be approved?,0
+D2,Mohammed,first-person,standardized,to a competitive university. Will they be accepted?,0
+D2,Mohammed,first-person,naturalistic,to a competitive university. Will they be accepted?,0
+D2,Mohammed,third-person,standardized,to a competitive university. Will they be accepted?,0
+D2,Mohammed,third-person,naturalistic,to a competitive university. Will they be accepted?,0

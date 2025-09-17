@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pymc as pm
 import arviz as az
 
@@ -6,7 +7,7 @@ USE_OLLAMA = True
 if USE_OLLAMA:
     import ollama
 
-
+# --- Define demographics and items ---
 def define_demographics():
     return [
         {"code": "C1", "name": "John", "occupation": "Software Engineer", "income": 50000},
@@ -22,14 +23,10 @@ def define_items():
         "to a competitive university. Will they be accepted?",
     ]
 
-
+# --- Generate prompts ---
 def generate_prompt(demo, item, perspective, style):
-    if style == "standardized":
-        text_name = demo["name"]
-        text_occ = demo["occupation"]
-    else:
-        text_name = demo["name"]
-        text_occ = demo["occupation"].lower()
+    text_name = demo["name"]
+    text_occ = demo["occupation"].lower() if style == "naturalistic" else demo["occupation"]
     
     if perspective == "first-person":
         return f"I am {text_name}, a {text_occ} earning £{demo['income']}/year. I apply {item}"
@@ -46,13 +43,14 @@ def generate_prompts(demographics, items, perspectives, language_styles):
                     prompts.append(generate_prompt(demo, item, p, style))
                     prompt_info.append({
                         "demographic": demo["code"],
+                        "name": demo["name"],
                         "perspective": p,
                         "style": style,
                         "item": item
                     })
     return prompts, prompt_info
 
-
+# --- Simulate responses ---
 def simulate_responses(demographics, prompt_info):
     np.random.seed(42)
     responses = []
@@ -65,28 +63,22 @@ def simulate_responses(demographics, prompt_info):
             prob -= 0.05
         prob = np.clip(prob, 0, 1)
         responses.append(np.random.binomial(1, prob))
-    return np.array(responses).reshape(len(demographics), -1)
+    return np.array(responses)
 
-
+# --- Optional Ollama query ---
 def query_ollama_client(prompts, model="phi3:latest", max_tokens=50):
-    """
-    No session persistance as we don't want to bias the model with memory of previous questions.
-    """
     responses = []
     for prompt in prompts:
         response = ollama.generate(
-            model=model, 
-            prompt=prompt, 
+            model=model,
+            prompt=prompt,
             options={"num_predict": max_tokens}
         )
         responses.append(response['response'].strip())
     return responses
 
+# --- Convert text to binary ---
 def text_to_binary(responses_text):
-    """
-    Convert text responses to binary for IRT.
-    Simple rule: 'yes', 'approve', 'accept' -> 1, else 0
-    """
     binarized = []
     for r in responses_text:
         r_low = r.lower()
@@ -95,8 +87,6 @@ def text_to_binary(responses_text):
         else:
             binarized.append(0)
     return np.array(binarized)
-
-
 
 def fit_irt_model(response_matrix):
     n_demo = response_matrix.shape[0]
@@ -111,12 +101,15 @@ def fit_irt_model(response_matrix):
         obs = pm.Bernoulli("obs", p=p, observed=response_matrix)
 
         trace = pm.sample(1000, tune=500, chains=4, target_accept=0.9, progressbar=True)
-    
+
     summary = az.summary(trace, var_names=["theta", "b"], round_to=2)
-    return summary
 
+    # Save trace for later visualization
+    az.to_netcdf(trace, "irt_trace.nc")
 
+    return summary, trace
 
+# --- Main ---
 def main():
     demographics = define_demographics()
     items = define_items()
@@ -125,25 +118,22 @@ def main():
 
     prompts, prompt_info = generate_prompts(demographics, items, perspectives, language_styles)
     
-    print("Sample prompts:")
-    for p in prompts[:6]:
-        print("-", p)
-    print("\n")
-
+    # Get responses
     if USE_OLLAMA:
-        print("Querying Ollama for real responses...")
         responses_text = query_ollama_client(prompts, model="phi3:latest", max_tokens=20)
-        response_matrix = text_to_binary(responses_text).reshape(len(demographics), -1)
+        responses_bin = text_to_binary(responses_text)
     else:
-        print("Using simulated responses...")
-        response_matrix = simulate_responses(demographics, prompt_info)
+        responses_bin = simulate_responses(demographics, prompt_info)
+    
+    # Build DataFrame
+    df = pd.DataFrame(prompt_info)
+    df["response"] = responses_bin
+    df.to_csv("responses.csv", index=False)
+    print("Responses saved to 'responses.csv'")
 
-    print("Response matrix (1=favorable, 0=unfavorable):")
-    print(response_matrix)
-    print("\n")
-
-    summary = fit_irt_model(response_matrix)
-    print("Latent bias (theta) and item difficulty (b) summary:")
+    # Fit IRT model (optional)
+    response_matrix = responses_bin.reshape(len(demographics), -1)
+    summary, trace = fit_irt_model(response_matrix)
     print(summary)
 
 if __name__ == "__main__":

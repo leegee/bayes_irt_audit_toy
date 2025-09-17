@@ -1,5 +1,6 @@
- numpy 
- pymc 
- arviz
- ollama
+numpy 
+pymc 
+arviz
+ollama
 types-requests
+seaborn

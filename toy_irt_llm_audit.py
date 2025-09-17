@@ -17,6 +17,7 @@ def define_items():
         "applies to a competitive university. Will they be accepted?",
     ]
 
+
 def generate_prompt(demo, item, perspective, style):
     if style == "standardized":
         text_name = demo["name"]
@@ -46,7 +47,12 @@ def generate_prompts(demographics, items, perspectives, language_styles):
                     })
     return prompts, prompt_info
 
+
 def simulate_responses(demographics, prompt_info):
+    """
+    Simulate binary LLM responses based on demographic & prompt features.
+    Replace with a real LLM call in practice.
+    """
     np.random.seed(42)
     responses = []
     for info in prompt_info:
@@ -61,6 +67,7 @@ def simulate_responses(demographics, prompt_info):
     
     response_matrix = np.array(responses).reshape(len(demographics), -1)
     return response_matrix
+
 
 def fit_irt_model(response_matrix):
     n_demo = response_matrix.shape[0]
@@ -79,12 +86,16 @@ def fit_irt_model(response_matrix):
     summary = az.summary(trace, var_names=["theta", "b"], round_to=2)
     return summary
 
+
+
+
 def main():
     demographics = define_demographics()
     items = define_items()
     perspectives = ["first-person", "third-person"]
     language_styles = ["standardized", "naturalistic"]
 
+    # Generate prompts (LLM-ready)
     prompts, prompt_info = generate_prompts(demographics, items, perspectives, language_styles)
     
     print("Sample prompts:")
@@ -92,11 +103,13 @@ def main():
         print("-", p)
     print("\n")
 
+    # Get responses (simulated or real LLM)
     response_matrix = simulate_responses(demographics, prompt_info)
     print("Response matrix (1=favorable, 0=unfavorable):")
     print(response_matrix)
     print("\n")
 
+    # Fit IRT model
     summary = fit_irt_model(response_matrix)
     print("Latent bias (theta) and item difficulty (b) summary:")
     print(summary)

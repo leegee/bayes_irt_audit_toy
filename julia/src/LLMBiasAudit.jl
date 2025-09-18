@@ -125,7 +125,11 @@ function main(; use_ollama::Bool=true)
     prompts, prompt_info = generate_prompts(demographics, items)
     responses_bin = if use_ollama
         responses_text = query_ollama_client(prompts)
-        responses_raw = responses_text
+        responses_raw = strip(replace(responses_text,
+            r"[\n\r\f]+" => " ",
+            r"\s+" => " "
+        ))
+
         text_to_binary(responses_text)
     else
         simulate_responses(demographics, prompt_info)

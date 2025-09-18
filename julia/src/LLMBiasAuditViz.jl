@@ -1,69 +1,37 @@
 module LLMBiasAuditViz
 
-using CSV
-using DataFrames
-using Plots
-using StatsPlots
+using DataFrames, CSV, StatsPlots
 
 export visualize_responses
 
-"""
-    visualize_responses(csv_file::String; outdir::String="plots")
+function visualize_responses(file_pattern::String="responses_*.csv")
+    # Find all CSV files matching the pattern
+    files = sort(readdir(pwd(); join=true))
+    files = filter(f -> occursin(r"responses_.*\.csv", f), files)
 
-Reads the CSV output from LLMBiasAudit and plots:
-1. Bar chart of 0/1 responses by demographic and item
-2. Heatmap of the response matrix
+    all_data = DataFrame()
+    for f in files
+        df = CSV.read(f, DataFrame)
+        model_name = match(r"responses_(.*)\.csv", f).captures[1]
+        df[!, :model] .= model_name
+        append!(all_data, df)
+    end
 
-Both plots are saved as PNG files in `outdir`.
-"""
-function visualize_responses(csv_file::String; outdir::String="plots")
-    # Create output directory if it doesn't exist
-    isdir(outdir) || mkpath(outdir)
+    # Aggregate by item and model
+    agg = combine(groupby(all_data, [:item, :model]), :response_bin => mean => :yes_rate)
 
-    # Load CSV
-    df = CSV.read(csv_file, DataFrame)
-
-    # Add a label
-    df.demographic_label = string.(df.demographic, " - ", df.name)
-
-    # Short item labels for plotting
-    item_labels = ["Managerial job", "Loan", "University"]
-
-    # Ensure categorical ordering
-    demographics = unique(df.name)
-    items = unique(df.item)
-
-    # --- Bar chart ---
-    bar_plot = @df df groupedbar(:demographic_label, :response,
-        group=:item,
+    # Plot
+    @df agg groupedbar(
+        :item,
+        :yes_rate,
+        group=:model,
         bar_position=:dodge,
-        xlabel="Demographic",
-        ylabel="Response (0=No, 1=Yes)",
         legend=:topright,
-        title="Responses by Demographic and Item"
+        xlabel="Item",
+        ylabel="Proportion of Yes",
+        title="Comparative LLM Responses",
+        rotation=30
     )
-
-    savefig(bar_plot, joinpath(outdir, "responses_bar.png"))
-    println("Grouped bar chart saved to $(joinpath(outdir, "responses_bar.png"))")
-
-    # --- Heatmap ---
-    # reshape response vector into n_demo × n_items
-    demographics_labels = unique(df.demographic_label)
-    matrix = reshape(df.response, length(demographics_labels), length(items))
-
-    heat_plot = heatmap(matrix,
-        xlabel="Items",
-        ylabel="Demographics",
-        xticks=(1:length(items), item_labels),
-        yticks=(1:length(demographics_labels), demographics_labels),
-        xrotation=30,
-        c=:blues,
-        size=(800, 400),
-        title="Responses Heatmap"
-    )
-
-    savefig(heat_plot, joinpath(outdir, "responses_heatmap.png"))
-    println("Heatmap saved to $(joinpath(outdir, "responses_heatmap.png"))")
 end
 
 end # module

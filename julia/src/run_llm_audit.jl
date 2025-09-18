@@ -2,4 +2,4 @@
 
 include("LLMBiasAudit.jl")
 
-LLMBiasAudit.main(use_ollama=true)
+LLMBiasAudit.main()

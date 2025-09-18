@@ -111,28 +111,6 @@ function fit_irt_model(response_matrix::Matrix{Int})
     return chain
 end
 
-function extract_irt_summary(all_chains::Dict{String,Any}, demographics::Vector{Demographic}, items::Vector{String})
-    summary = Dict{String,Any}()
-    for (model_name, chain) in all_chains
-        theta_samples = chain[:θ]  # samples: n_samples × n_demo
-        b_samples = chain[:b]  # samples: n_samples × n_items
-
-        theta_mean = StatsFuns.mean(theta_samples, dims=1) |> vec
-        theta_sd = StatsFuns.std(theta_samples, dims=1) |> vec
-        b_mean = StatsFuns.mean(b_samples, dims=1) |> vec
-        b_sd = StatsFuns.std(b_samples, dims=1) |> vec
-
-        summary[model_name] = Dict(
-            "theta_mean" => theta_mean,
-            "theta_sd" => theta_sd,
-            "b_mean" => b_mean,
-            "b_sd" => b_sd,
-            "demographics" => [demo.name for demo in demographics],
-            "items" => items
-        )
-    end
-    return summary
-end
 
 function main()
     demographics = define_demographics()
@@ -152,27 +130,23 @@ function main()
         all_responses_raw[model_name] = responses_clean
         all_responses_bin[model_name] = responses_bin
 
-        CSV.write("responses_$(model_name).csv",
+        CSV.write("csv/responses_$(model_name).csv",
             DataFrames.DataFrame(prompt=prompts, response_text=responses_clean, response_bin=responses_bin))
-        println("Responses for model $(model_name) saved to 'responses_$(model_name).csv'")
+        println("Responses for model $(model_name) saved to 'csv/responses_$(model_name).csv'")
 
         response_matrix = reshape(responses_bin, length(demographics), length(items))
         chain = fit_irt_model(response_matrix)
 
-        JLD2.@save "irt_chain_$(model_name).jld2" chain
-        println("IRT chain for model $(model_name) saved to 'irt_chain_$(model_name).jld2'")
+        JLD2.@save "jld2/irt_chain_$(model_name).jld2" chain
+        println("IRT chain for model $(model_name) saved to 'jld2/irt_chain_$(model_name).jld2'")
 
         all_chains[model_name] = chain
     end
 
-    JLD2.@save "irt_all_chains.jld2" all_chains
-    println("All IRT chains saved to 'irt_all_chains.jld2'")
+    JLD2.@save "jld2/irt_all_chains.jld2" all_chains demographics items
+    println("All IRT chains saved to 'jld2/irt_all_chains.jld2'")
 
-    all_summary = extract_irt_summary(all_chains, demographics, items)
-    JLD2.@save "irt_summary.jld2" all_summary
-    println("IRT summary saved to 'irt_summary.jld2'")
-
-    return all_responses_raw, all_responses_bin, all_chains, all_summary
+    return all_responses_raw, all_responses_bin, all_chains
 end
 
 end # module

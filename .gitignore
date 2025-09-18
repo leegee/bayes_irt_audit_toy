@@ -2,3 +2,4 @@
 julia/plots/*.png
 julia/*.csv
 python/*.csv
+julia/.png

@@ -1,5 +1,4 @@
 .venv
-julia/plots/*.png
-julia/*.csv
-python/*.csv
-julia/.png
+julia/csv
+julia/jld2
+julia/plots

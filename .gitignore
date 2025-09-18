@@ -1,5 +1,4 @@
 .venv
-julia/plots/responses_heatmap.png
-julia/plots/responses_bar.png
-julia/responses.csv
-python/responses.csv
+julia/plots/*.png
+julia/*.csv
+python/*.csv

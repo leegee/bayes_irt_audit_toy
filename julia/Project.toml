@@ -1,0 +1,20 @@
+name = "LLMBiasAudit"
+uuid = "f8b012c6-ec4a-447d-a03d-4c11c63ceab1"
+authors = ["Lee Goddard <leegee@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+PromptingTools = "670122d1-24a8-4d70-bfce-740807c42192"
+StatsFuns = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
+Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
+
+[compat]
+CSV = "0.10.15"
+DataFrames = "1.8.0"
+Distributions = "0.25.120"
+PromptingTools = "0.81.1"
+StatsFuns = "1.5.0"
+Turing = "0.40.3"

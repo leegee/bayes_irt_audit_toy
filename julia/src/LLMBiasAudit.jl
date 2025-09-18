@@ -123,6 +123,7 @@ function main()
     all_chains = Dict{String,Any}()
 
     for model_name in models
+        println("Running model $(model_name)...")
         responses_text = query_ollama_client(prompts; model=model_name)
         responses_clean = [String(strip(PromptingTools.replace(r, r"[\n\r\f]+" => " "))) for r in responses_text]
         responses_bin = text_to_binary(responses_clean)

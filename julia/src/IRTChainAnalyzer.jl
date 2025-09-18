@@ -116,7 +116,7 @@ end
 # --------------------------
 function save_summary_and_plots(summary::Dict{String,Any}; prefix::String="")
     # Save the summary as JLD2
-    JLD2.@save "jld2/$(prefix)_summary.jld2" summary
+    JLD2.@save "$(prefix)_summary.jld2" summary
     @info "Saved summary to $(prefix)_summary.jld2"
 
     # Save individual model plots

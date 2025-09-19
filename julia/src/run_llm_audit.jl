@@ -2,4 +2,4 @@
 
 include("LLMBiasAudit.jl")
 
-LLMBiasAudit.main()
+LLMBiasAudit.main(models=["phi3:latest"])

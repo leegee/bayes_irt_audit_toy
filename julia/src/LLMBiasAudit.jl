@@ -131,15 +131,19 @@ function main()
         all_responses_raw[model_name] = responses_clean
         all_responses_bin[model_name] = responses_bin
 
-        CSV.write("csv/responses_$(model_name).csv",
+        safe_model_name = replace(model_name, r"[^A-Za-z0-9]" => "_")
+
+        filename = "csv/responses_$(safe_model_name).csv"
+        CSV.write(filename,
             DataFrames.DataFrame(prompt=prompts, response_text=responses_clean, response_bin=responses_bin))
-        println("Responses for model $(model_name) saved to 'csv/responses_$(model_name).csv'")
+        println("Responses for model $(model_name) saved to '$(filename)'")
 
         response_matrix = reshape(responses_bin, length(demographics), length(items))
         chain = fit_irt_model(response_matrix)
 
-        JLD2.@save "jld2/irt_chain_$(model_name).jld2" chain
-        println("IRT chain for model $(model_name) saved to 'jld2/irt_chain_$(model_name).jld2'")
+        filename = "jld2/irt_chain_$(safe_model_name).jld2"
+        JLD2.@save filename chain
+        println("IRT chain for model $(model_name) saved to '$(filename)'")
 
         all_chains[model_name] = chain
     end

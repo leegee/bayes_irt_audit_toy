@@ -3,4 +3,4 @@
 include("LLMBiasAuditViz.jl")
 using .LLMBiasAuditViz
 
-LLMBiasAuditViz.visualize_responses("responses.csv")
+LLMBiasAuditViz.visualize_responses()

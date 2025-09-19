@@ -1,27 +1,36 @@
 module LLMBiasAuditViz
 
-using DataFrames, CSV, StatsPlots
+# Import modules without polluting global namespace
+import DataFrames
+import CSV
+import StatsPlots
+import Statistics
 
 export visualize_responses
 
-function visualize_responses(file_pattern::String="responses_*.csv")
+function visualize_responses(file_pattern::Regex=r"^csv/responses_(.*)\.csv$")
     # Find all CSV files matching the pattern
     files = sort(readdir(pwd(); join=true))
-    files = filter(f -> occursin(r"responses_.*\.csv", f), files)
+    files = filter(f -> occursin(file_pattern, f), files)
 
-    all_data = DataFrame()
-    for f in files
-        df = CSV.read(f, DataFrame)
-        model_name = match(r"responses_(.*)\.csv", f).captures[1]
+    all_data = DataFrames.DataFrame()
+    for file in files
+        df = CSV.read(file, DataFrames.DataFrame)
+        model_name = match(file_pattern, file).captures[1]
+        println("Read $(model_name) from $(file)")
         df[!, :model] .= model_name
-        append!(all_data, df)
+        DataFrames.append!(all_data, df)
     end
 
     # Aggregate by item and model
-    agg = combine(groupby(all_data, [:item, :model]), :response_bin => mean => :yes_rate)
+    agg = DataFrames.combine(
+        DataFrames.groupby(all_data, [:item, :model]),
+        #:column_name => function => output_column_name
+        :response_bin => Statistics.mean => :yes_rate
+    )
 
     # Plot
-    @df agg groupedbar(
+    StatsPlots.@df agg StatsPlots.groupedbar(
         :item,
         :yes_rate,
         group=:model,

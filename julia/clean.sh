@@ -1,5 +1,5 @@
 #!/usr/bin/bash
 
-rm csv/*
-rm plots/*
-rm jld2/*
+rm -f csv/*
+rm -f plots/*
+rm -f jld2/*

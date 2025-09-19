@@ -1,6 +1,6 @@
 name = "LLMBiasAudit"
 uuid = "f8b012c6-ec4a-447d-a03d-4c11c63ceab1"
-authors = ["Lee Goddard <leegee@gmail.com>"]
+authors = ["Lee Goddard <cv@lee.goddards.space>"]
 version = "0.1.0"
 
 [deps]

@@ -22,3 +22,11 @@ Result: chains for θ and b show which demographics/models are treated more/less
 
     P(θ,b∣Y) ∝ P( Y∣θ,b) P(θ)P(b)
 
+As a toy, this only runs on a few local Ollama models.
+
+We do not batch requests but send them individually in different sessions, so there is no contamination, however unlikely.
+
+Currently being addressed is conversion of the respnses to binary.
+
+
+

@@ -131,8 +131,20 @@ end
 
 
 function text_to_binary(responses_text::Vector{String})
-    return [occursin(r"yes|approve|accept|hire", lowercase(r)) ? 1 : 0 for r in responses_text]
+    binary = Int[]
+    for r in responses_text
+        r_low = lowercase(r)
+        if occursin(r"no|reject|decline", r_low)
+            push!(binary, 0)
+        elseif occursin(r"yes|approve|accept", r_low)
+            push!(binary, 1)
+        else
+            push!(binary, 0)  # default conservative
+        end
+    end
+    return binary
 end
+
 
 function fit_irt_model(response_matrix::Matrix{Int})
     n_demo, n_items_total = size(response_matrix)

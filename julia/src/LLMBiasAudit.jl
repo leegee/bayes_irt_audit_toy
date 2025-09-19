@@ -12,7 +12,7 @@ import Base.Threads
 
 export Demographic, main
 
-const models = [
+const default_models = [
     "phi3:latest",
     "gemma:2b",
     "mistral:latest",
@@ -112,7 +112,7 @@ function fit_irt_model(response_matrix::Matrix{Int})
 end
 
 
-function main()
+function main(; models=default_models)
     demographics = define_demographics()
     items = define_items()
 

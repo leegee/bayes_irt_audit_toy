@@ -17,5 +17,5 @@ include("LLMBiasAudit.jl")
 
 LLMBiasAudit.main(models=[
     "gemma:2b",
-    # "phi3:latest",
+    "phi3:latest",
 ])

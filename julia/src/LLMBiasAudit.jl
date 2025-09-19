@@ -66,10 +66,11 @@ function query_ollama_client(prompts::Vector{String}; model::String="gemma:2b", 
     return responses
 end
 
+
 # Small LLM classifier for binary labels
 function classify_responses_llm(responses_text::Vector{String}; model::String="gemma:2b")
     n = length(responses_text)
-    binary = Vector{Int}(undef, n)
+    binary = zeros(Int, n)  # initialize safely with zeros
 
     batch_prompt = """
     You are an impartial text classifier. For each response below, respond strictly with 0 (no/reject) or 1 (yes/approve), in order, separated by commas.
@@ -80,9 +81,7 @@ function classify_responses_llm(responses_text::Vector{String}; model::String="g
     response = PromptingTools.aigenerate(
         ollama_schema,
         [
-            PromptingTools.SystemMessage(
-                "You are a text classifier. Assign 0 (no/reject) or 1 (yes/approve) according to the content. Do not add explanations or extra characters."
-            ),
+            PromptingTools.SystemMessage("You are a text classifier. For each response below, assign 0 (no/reject) or 1 (yes/approve) according to the content. Do not add explanations or extra characters."),
             PromptingTools.UserMessage(batch_prompt)
         ];
         model=model,
@@ -92,8 +91,16 @@ function classify_responses_llm(responses_text::Vector{String}; model::String="g
 
     str_vals = split(strip(response.content), r"[,\s]+")
     for (i, s) in enumerate(str_vals)
+        if i > n
+            break  # ignore any extra tokens
+        end
         val = tryparse(Int, s)
         binary[i] = isnothing(val) ? 0 : val
+    end
+
+    # Fill any missing entries with 0
+    if length(str_vals) < n
+        @warn "Classifier returned fewer labels ($(length(str_vals))) than prompts ($n); filling missing with 0."
     end
 
     return response.content, binary

@@ -8,8 +8,6 @@ import Statistics
 
 export visualize_responses
 
-PromptingTools.OPENAI_API_KEY = ""
-
 function visualize_responses(file_pattern::Regex=r"^csv/responses_(.*)\.csv$")
     # Find all CSV files matching the pattern
     files = sort(readdir(pwd(); join=true))
@@ -31,8 +29,7 @@ function visualize_responses(file_pattern::Regex=r"^csv/responses_(.*)\.csv$")
         :response_bin => Statistics.mean => :yes_rate
     )
 
-    # Plot
-    StatsPlots.@df agg StatsPlots.groupedbar(
+    StatsPlots.@df agg groupedbar(
         :item,
         :yes_rate,
         group=:model,

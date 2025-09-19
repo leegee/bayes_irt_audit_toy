@@ -11,9 +11,11 @@ import Base.Threads
 
 export Demographic, main
 
+PromptingTools.OPENAI_API_KEY = ""
+
 const default_models = [
-    "phi3:latest",
     "gemma:2b",
+    "phi3:latest",
     "mistral:latest",
     "llama3:latest"
 ]
@@ -69,7 +71,7 @@ function generate_prompts(demographics::Vector{Demographic}, items::Vector{Strin
     return prompts, prompt_info
 end
 
-function query_ollama_client(prompts::Vector{String}; model::String="gemma:2b", max_tokens::Int=50)
+function query_ollama_client_singular(prompts::Vector{String}; model::String="gemma:2b", max_tokens::Int=50)
     responses = String[]
     for prompt in prompts
         system_msg, user_template = PROMPT_MESSAGES
@@ -88,6 +90,45 @@ function query_ollama_client(prompts::Vector{String}; model::String="gemma:2b", 
     end
     return responses
 end
+
+
+function query_ollama_client(
+    prompts::Vector{String};
+    model::String="gemma:2b",
+    max_tokens::Int=50
+)
+    n = length(prompts)
+    responses = Vector{String}(undef, n)
+    system_msg, user_template = PROMPT_MESSAGES
+
+    n_threads = Threads.nthreads() > 1 ? Threads.nthreads() : 1
+
+    println("Running LLM queries on $(n_threads) threads...")
+
+    Threads.@threads for i in 1:n
+        prompt = prompts[i]
+        messages = [
+            PromptingTools.SystemMessage(system_msg["content"]),
+            PromptingTools.UserMessage(
+                PromptingTools.replace(user_template["content"], "{{decision}}" => prompt)
+            )
+        ]
+        response = PromptingTools.aigenerate(
+            ollama_schema,
+            messages;
+            model=model,
+            max_tokens=max_tokens,
+            api_kwargs=(url="http://localhost",)
+        )
+        responses[i] = response.content
+
+        Threads.@spawn println("Prompt $(i)/$(n) done")
+    end
+
+    return responses
+end
+
+
 
 function text_to_binary(responses_text::Vector{String})
     return [occursin(r"yes|approve|accept|hire", lowercase(r)) ? 1 : 0 for r in responses_text]

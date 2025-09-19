@@ -24,7 +24,7 @@ using .IRTChainAnalyzer
 summary, demographics, items = IRTChainAnalyzer.load_all_and_summarize("jld2/irt_all_chains.jld2")
 
 # Inspect results for a specific model
-# model = "phi3:latest"
+# model = "gemma:2b"
 # summary[model]["theta_mean"]    # posterior means for demographics
 # summary[model]["theta_sd"]      # posterior SDs for demographics
 # summary[model]["b_mean"]        # posterior means for items

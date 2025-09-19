@@ -1,4 +1,4 @@
-module IRTUtils
+module IRT
 
 import Turing
 import Distributions

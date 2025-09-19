@@ -60,7 +60,7 @@ function query_ollama_client(prompts::Vector{String}; model::String="gemma:2b", 
             api_kwargs=(url="http://localhost",)
         )
         # clean newlines/freespace characters
-        responses[i] = strip(replace(raw_classifier_output, r"[\n\r\f]+" => " "))
+        responses[i] = strip(replace(response.content, r"[\n\r\f]+" => " "))
     end
 
     return responses

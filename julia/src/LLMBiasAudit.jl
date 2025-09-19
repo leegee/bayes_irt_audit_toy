@@ -1,6 +1,5 @@
 module LLMBiasAudit
 
-import Random
 import DataFrames
 import CSV
 import Turing

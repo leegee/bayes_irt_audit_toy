@@ -13,9 +13,8 @@ const ollama_schema = PromptingTools.OllamaSchema()
 """
     classify_responses_llm(responses_text::Vector{String}; model::String="gemma:2b", save_csv::Bool=false, csv_file::String="responses_classified.csv")
 
-Classify verbose LLM responses into 0 (no/non-definite) or 1 (yes/definitive) using a small LLM. 
-
-Returns `(raw_output::Vector{String}, binary::Vector{Union{Int,Missing}})`. If `save_csv=true`, saves a CSV with prompts, raw classifier output, and parsed labels.
+Classify verbose LLM responses into 0 (no/reject) or 1 (yes/approve) using a small LLM. Returns `(raw_output::Vector{String}, binary::Vector{Union{Int,Missing}})`.
+If `save_csv=true`, saves a CSV with prompts, raw classifier output, and parsed labels.
 """
 function classify_responses_llm(
     responses_text::Vector{String};
@@ -33,7 +32,7 @@ function classify_responses_llm(
 
         messages = [
             PromptingTools.SystemMessage(
-                "You are a strict text classifier. Given the text below, output exactly one number: 0 if the text is non-definitive, 1 if it is definitive. Do NOT add explanations or extra characters."
+                "You are a strict text classifier. For the response below, output exactly one number: 0 for no/reject, 1 for yes/approve. Do NOT add explanations or extra characters."
             ),
             PromptingTools.UserMessage(response)
         ]

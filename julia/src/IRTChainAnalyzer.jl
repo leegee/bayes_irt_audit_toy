@@ -5,12 +5,18 @@ using MCMCChains
 using Statistics
 using StatsPlots
 using Printf
+using Logging
 
 export load_all_and_summarize, plot_posteriors, compare_models, save_summary_and_plots
 
-# --------------------------
+
+function safe_filename(model_name::String)
+    replace(model_name, r"[:/\\ ]" => "_")  # colons, slashes, spaces → underscores
+end
+
+
 # Load and summarize
-# --------------------------
+
 function load_all_and_summarize(filename::String)
     all_chains, demographics, items = JLD2.jldopen(filename, "r") do file
         chains = read(file, "all_chains")
@@ -46,9 +52,9 @@ function load_all_and_summarize(filename::String)
     return summary, demographics, items
 end
 
-# --------------------------
+
 # Single model plot
-# --------------------------
+
 function plot_posteriors(summary::Dict{String,Any}; model::String="", type::Symbol=:theta)
     if isempty(model)
         model = first(keys(summary))
@@ -75,62 +81,8 @@ function plot_posteriors(summary::Dict{String,Any}; model::String="", type::Symb
         title=title_txt, rotation=45, size=(1000, 400))
 end
 
-# --------------------------
+
 # Compare multiple models
-# --------------------------
-function compare_models(summary::Dict{String,Any}; type::Symbol=:theta, savepath::String="")
-    models = keys(summary)
-    if type == :theta
-        labels = summary[first(models)]["demographics"]
-        title_txt = "Comparison of θ (Demographics) across models"
-    elseif type == :b
-        labels = summary[first(models)]["items"]
-        title_txt = "Comparison of b (Items) across models"
-    else
-        error("type must be :theta or :b")
-    end
-
-    n = length(labels)
-    colors = palette(:tab10)
-    plot(size=(1200, 500), xlabel="", ylabel="Posterior mean", xticks=(1:n, labels), rotation=45, title=title_txt)
-
-    for (i, model) in enumerate(models)
-        if type == :theta
-            y = summary[model]["theta_mean"]
-        else
-            y = summary[model]["b_mean"]
-        end
-        scatter!(1:n, y, label=model, markersize=6, color=colors[(i-1)%length(colors)+1])
-    end
-
-    if !isempty(savepath)
-        png(savepath)
-        @info "Saved comparison plot to $savepath"
-    end
-
-    return current()
-end
-
-# --------------------------
-# Save summary and plots
-# --------------------------
-function save_summary_and_plots(summary::Dict{String,Any}; prefix::String="")
-    # Save the summary as JLD2
-    JLD2.@save "$(prefix)_summary.jld2" summary
-    @info "Saved summary to $(prefix)_summary.jld2"
-
-    # Save individual model plots
-    for model in keys(summary)
-        plot_posteriors(summary, model=model, type=:theta)
-        png("$(prefix)_theta_$(model).png")
-        plot_posteriors(summary, model=model, type=:b)
-        png("$(prefix)_b_$(model).png")
-    end
-
-    # Save comparison plots
-    compare_models(summary, type=:theta, savepath="$(prefix)_theta_comparison.png")
-    compare_models(summary, type=:b, savepath="$(prefix)_b_comparison.png")
-end
 
 function compare_models(summary::Dict{String,Any}; type::Symbol=:theta, savepath::String="")
     models = collect(keys(summary))
@@ -158,16 +110,53 @@ function compare_models(summary::Dict{String,Any}; type::Symbol=:theta, savepath
             yerr = summary[model]["b_sd"]
         end
 
-        # Scatter with error bars
-        scatter!(1:n, y, yerr=yerr, label=model, color=colors[(i-1)%length(colors)+1], markersize=6)
+        scatter!(1:n, y, yerr=yerr, label=model,
+            color=colors[(i-1)%length(colors)+1], markersize=6)
     end
 
     if !isempty(savepath)
         png(savepath)
-        @info "Saved comparison plot with error bars to $savepath"
+        @info "Saved comparison plot to $(savepath)"
     end
 
     return plt
+end
+
+
+# Save summary and plots
+
+function save_summary_and_plots(summary::Dict{String,Any}; prefix::String="")
+    # Save the summary as JLD2
+    filepath = "$(prefix)_summary.jld2"
+    JLD2.@save filepath summary
+    @info "Saved summary to $(filepath)"
+
+    # Save individual model plots
+    for model in keys(summary)
+        safe_name = safe_filename(model)
+
+        # θ plot
+        theta_plot = plot_posteriors(summary, model=model, type=:theta)
+        theta_file = "$(prefix)_theta_$(safe_name).png"
+        savefig(theta_plot, theta_file)
+        @info "Saved θ plot for model $(model) to $(theta_file)"
+
+        # b plot
+        b_plot = plot_posteriors(summary, model=model, type=:b)
+        b_file = "$(prefix)_b_$(safe_name).png"
+        savefig(b_plot, b_file)
+        @info "Saved b plot for model $(model) to $(b_file)"
+    end
+
+    # Save comparison plots with sanitized names
+    models_sorted = sort(collect(keys(summary)))
+    safe_models = join(safe_filename.(models_sorted), "_vs_")
+
+    theta_comp_file = "$(prefix)_theta_comparison_$(safe_models).png"
+    compare_models(summary, type=:theta, savepath=theta_comp_file)
+
+    b_comp_file = "$(prefix)_b_comparison_$(safe_models).png"
+    compare_models(summary, type=:b, savepath=b_comp_file)
 end
 
 end # module

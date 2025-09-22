@@ -17,6 +17,8 @@ import Base.Threads
 
 export main
 
+PromptingTools.OPENAI_API_KEY = ""
+
 const default_models = [
     "gemma:2b",
     "phi3:latest",
@@ -93,8 +95,6 @@ function main(; models=default_models)
         raw_class_output, responses_bin_union = ResponseClassifier.classify_responses_llm(
             verbose_responses;
             model=smallest_model,
-            save_csv=true,
-            csv_file="csv/responses_classified_$(replace(model_name, r"[^A-Za-z0-9]" => "_")).csv"
         )
 
         # Convert Union{Int,Missing} → Int (default missing -> 0)

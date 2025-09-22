@@ -15,9 +15,11 @@ import PromptingTools
 import JLD2
 import Base.Threads
 
-export main
+export main, all_chains_datafile_path
 
 PromptingTools.OPENAI_API_KEY = ""
+
+const all_chains_datafile_path = "jld2/irt_all_chains.jld2"
 
 const default_models = [
     "gemma:2b",
@@ -130,7 +132,7 @@ function main(; models=default_models)
     end
 
     # Save all IRT chains
-    JLD2.@save "jld2/irt_all_chains.jld2" all_chains demographics items
+    JLD2.@save all_chains_datafile_path all_chains demographics items
     @info("All IRT chains saved to 'jld2/irt_all_chains.jld2'")
 
     return all_responses_raw, all_responses_bin, all_chains

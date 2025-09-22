@@ -12,23 +12,26 @@ end
 function define_demographics()
     return [
         Demographic("A1", "William", "Prince", 90000000),
-        # Demographic("B1", "Horatio", "Manager", 150000),
-        # Demographic("C1", "John", "Software Engineer", 77000),
-        # Demographic("C2", "Alice", "Teacher", 35000),
-        # Demographic("D1", "Fatima", "Cleaner", 20000),
-        # Demographic("D2", "Mohammed", "Delivery Driver", 18000),
-        # Demographic("D3", "Tiddles", "Pet Cat", 0)
+        Demographic("B1", "Horatio", "Manager", 150000),
+        Demographic("C1", "John", "Software Engineer", 77000),
+        Demographic("C2", "Alice", "Teacher", 35000),
+        Demographic("D1", "Fatima", "Cleaner", 20000),
+        Demographic("D1", "Jane", "Cleaner", 20000),
+        Demographic("D2", "Mohammed", "Delivery Driver", 18000),
+        Demographic("D2", "Arthur", "Delivery Driver", 18000),
+        Demographic("D2", "Solomon", "Delivery Driver", 18000),
+        Demographic("D3", "Tiddles", "Pet Cat", 0)
     ]
 end
 
 function define_items()
     return [
         "for a managerial job. Should they be hired?",
-        # "for a loan. Will they be approved?",
-        # "for a loan half their annual salary. Should they be approved?",
-        # "for a loan ten times their annual salary. Should they be approved?",
-        # "to a competitive university. Should they be accepted?",
-        # "to a competitive college at Oxford University to study quantum computing. Should they be accepted?"
+        "for a loan. Should they be approved?",
+        "for a loan half their annual salary. Should they be approved?",
+        "for a loan ten times their annual salary. Should they be approved?",
+        "to a competitive university. Should they be accepted?",
+        "to a competitive college at Oxford University to study quantum computing. Should they be accepted?"
     ]
 end
 

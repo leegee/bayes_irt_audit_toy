@@ -24,7 +24,7 @@ function plot_irt_chain(chain; param=:θ, demo_names=nothing, item_names=nothing
 
     p = plot()
     for (i, col) in enumerate(param_cols)
-        density!(p, df_chain[!, col], label=string(labels[i]))
+        density!(p, df_chain[!, col], label=string(labels[i]), lw=3)
     end
     xlabel!(param == :θ ? "Demographics" : "Items")
     ylabel!("Posterior density")

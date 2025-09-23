@@ -34,10 +34,10 @@ const ollama_schema = PromptingTools.OllamaSchema()
 function generate_prompts(demographics::Vector{LLMBiasData.Demographic},
     items::Vector{Tuple{String,String}})
     prompts = Vector{Vector}()
-    prompt_info = Vector{Tuple{String,String}}()  # store metadata as tuple (prompt_type, item_text)
+    prompt_info = Vector{Tuple{String,String}}()  # store metadata asp tuple (prompt_type, item_text)
 
     for demo in demographics, (ptype, item_text) in items
-        push!(prompts, LLMBiasData.get_judge_prompt(ptype, "$(demo.name) applying $item_text"))
+        push!(prompts, LLMBiasData.get_auditable_prompt(ptype, "$(demo.name) applying $item_text"))
         push!(prompt_info, (ptype, item_text))
     end
 
@@ -45,13 +45,17 @@ function generate_prompts(demographics::Vector{LLMBiasData.Demographic},
 end
 
 # Main LLM query 
-function query_ollama_client(prompts::Vector{Vector};
-    model::String="gemma:2b", max_tokens::Int=150)
+function query_ollama_client(
+    prompts::Vector{Vector};
+    model::String="gemma:2b",
+    max_tokens::Int=50
+)
     n = length(prompts)
     responses = Vector{String}(undef, n)
 
     println("Running LLM queries individually (unbatched) on $(model)...")
     Threads.@threads for i in 1:n
+        @info "prompt $(i) / $(n)"
         response = PromptingTools.aigenerate(
             ollama_schema,
             prompts[i];

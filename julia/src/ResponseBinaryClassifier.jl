@@ -38,7 +38,7 @@ function classify_responses_llm(
     for i in 1:n
         ptype, item, response = responses[i]
 
-        messages = LLMBiasData.get_judge_prompt(ptype, item)
+        messages = LLMBiasData.get_categoriser_prompt(ptype, item)
         push!(messages, PromptingTools.UserMessage(response))
 
         ai_response = PromptingTools.aigenerate(
@@ -59,8 +59,10 @@ function classify_responses_llm(
             binary[i] = missing
         else
             binary[i] = val
-            @info "PromptType: $(ptype)\nItem: $(item)\nOrig: $(response)\nResp: $(ai_response.content)\nClass: $(val)"
+            @info "PromptType: $(ptype)\nQuestion: $(item)\nOrig Response: $(response)\nClassifier: $(ai_response.content)\nFINAL: $(val)"
         end
+
+        @info "-------------------------------------------"
     end
 
     if csv_file !== nothing

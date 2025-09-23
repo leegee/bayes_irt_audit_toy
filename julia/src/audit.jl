@@ -15,7 +15,10 @@ println("Running Julia with $(Threads.nthreads()) threads.")
 
 include("LLMBiasAudit.jl")
 
-LLMBiasAudit.main(models=[
-    "gemma:2b",
-    "phi3:latest",
-])
+LLMBiasAudit.main(
+    models=[
+        "gemma:2b",
+        "phi3:latest",
+    ],
+    use_cache=false
+)

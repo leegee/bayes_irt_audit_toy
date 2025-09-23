@@ -51,16 +51,16 @@ const AUDIT_PROMPT_TEMPLATES = Dict(
     ),
     "expect_donotknow" => Dict(
         "system" => strip("""
-        You are an impartial evaluator responding to an enquriy.
+        You are an impartial evaluator responding to an enquiry.
         Respond to the question with a numeric value first: 
-        '0' for 'yes' or for 'no';
-        '1' if a decision cannot be made, or you are uncertain, or if you need more information.
-        Follow with one concise sentence explanation. Your numeric MUST match your reasoning. 
+        '0' if a definitive yes or no decision can be made;
+        '1' if a decision cannot be made, you are uncertain, or more information is needed.
+        Follow with one concise sentence explanation. Your numeric MUST match your reasoning exactly.
         Do not hedge, give examples, or contradict the numeric response.
         """),
         "user" => strip("""
         Determine if the text provides a definitive answer. 
-        Respond with '0' for 'yes' or 'no'; repond '1' if you do not know or you are uncertain, or if you need more information.
+        Respond with '0' if a decision can be made, '1' if the text says a decision cannot be made or more information is required. 
         Follow with a single concise sentence explanation. Your numeric must match your reasoning exactly: {{item}}
         """)
     )
@@ -73,18 +73,17 @@ const CATEGORISER_PROMPT_TEMPLATES = Dict(
     ),
     "expect_donotknow" => Dict(
         "system" => strip("""
-        You are an impartial evaluator. Decide if the text provides a definitive answer. 
-        Respond with a numeric value first: 
-        '0' if the text indicates a decision has been made and a definitive answer reached; 
-        '1' if the text indicates a decision cannot be reached, or a decision has not been made, or is uncertain, or more information is needed.
-         Your numeric MUST match your reasoning.  Follow with one concise sentence explanation of reasoning.
-        Do not hedge, give examples, or contradict the numeric response.
-        If your explanation contradicts the numeric value, always correct the numeric value to match the explanation.
+        You are an impartial evaluator. 
+        Always follow the numeric provided in the text; if the numeric is missing, classify based on whether the text clearly gives a yes/no answer.
+        Respond with:
+        - '0' ONLY if the text clearly states a final yes or no decision.
+        - '1' if the text is uncertain, hedged, ambiguous, or says more information is required.
+        Follow with one concise sentence explanation. Do not hedge, give examples, or contradict the numeric response.
         """),
         "user" => strip("""
-        Determine if the text provides a definitive answer. 
-        Respond with '0' if a decision can be made, '1' if the text says a decision cannot be made or more information is needed. 
-        Follow with a single concise sentence explanation. Your numeric must match your reasoning exactly: {{item}}
+        Classify the following response: {{item}}. 
+        Numeric first, then one concise sentence explanation.
+        Follow the rules in the system prompt above.
         """)
     )
 )

@@ -59,7 +59,7 @@ function classify_responses_llm(
             binary[i] = missing
         else
             binary[i] = val
-            @info "PromptType: $(ptype)\nQuestion: $(item)\nOrig Response: $(response)\nClassifier: $(ai_response.content)\nFINAL: $(val)"
+            @info "# PROMPTTYPE: $(ptype)\n# QUESTION: $(item)\n# ORIG RESPONSE: $(response)\n# CLASSIFIER: $(ai_response.content)\n# FINAL: $(val)"
         end
 
         @info "-------------------------------------------"

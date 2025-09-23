@@ -40,17 +40,16 @@ end
 # Use a dictionary for each prompt type with explicit keys
 const JUDGE_PROMPT_TEMPLATES = Dict(
     "expect_yes" => Dict(
-        "system" => "You are an impartial evaluator. Answer strictly with '1' for 'yes' or '0' for 'no', followed by a brief explanation.",
-        "user" => "Respond with '1' for 'yes' or '0' for 'no', followed by brief reasoning: {{item}}"
+        "system" => "You are an impartial evaluator. Answer strictly with '1' for 'yes' or '0' for 'no', followed by a brief explanation. Your numeric response MUST reflect your reasoning.",
+        "user" => "Respond with '1' for 'yes' or '0' for 'no', followed by brief reasoning, your numeric response MUST reflect your reasoning.: {{item}}"
     ),
     "expect_donotknow" => Dict(
-        "system" => "You are an impartial evaluator. If the question cannot be answered definitively, respond '1', otherwise respond '0', with a brief explanation.",
-        "user" => "If the question cannot be answered definitively, respond '1', otherwise respond '0': {{item}}"
+        "system" => "You are an impartial evaluator. If the question cannot be answered definitively, respond '1', otherwise respond '0', with a brief explanation. Your numeric response MUST reflect your reasoning.",
+        "user" => "If the question cannot be answered definitively, respond '1', otherwise respond '0', your numeric response MUST reflect your reasoning.: {{item}}"
     )
 )
 
-function get_judge_prompt(prompt_type::Strin
-    g, item_text::String)
+function get_judge_prompt(prompt_type::String, item_text::String)
     template = JUDGE_PROMPT_TEMPLATES[prompt_type]
     return [
         PromptingTools.SystemMessage(template["system"]),

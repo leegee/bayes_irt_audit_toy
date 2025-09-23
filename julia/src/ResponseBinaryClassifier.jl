@@ -4,6 +4,7 @@ import PromptingTools
 import Base.Threads
 import CSV
 import DataFrames
+import ..LLMBiasData
 
 export classify_responses_llm
 
@@ -11,31 +12,34 @@ PromptingTools.OPENAI_API_KEY = ""
 const ollama_schema = PromptingTools.OllamaSchema()
 
 """
-    classify_responses_llm(responses_text::Vector{String}; model::String="gemma:2b", save_csv::Bool=false, csv_file::String="responses_classified.csv")
+    classify_responses_llm(responses::Vector{Tuple{String,String,String}};
+                           model::String="gemma:2b",
+                           csv_file::Union{Nothing,String}=nothing)
 
-Classify verbose LLM responses into 0 (no/reject) or 1 (yes/approve) using a small LLM. Returns `(raw_output::Vector{String}, binary::Vector{Union{Int,Missing}})`.
-If `save_csv=true`, saves a CSV with prompts, raw classifier output, and parsed labels.
+Classify verbose LLM responses into 0 (non-definitive) or 1 (definitive decision) 
+using a small LLM. 
+
+`responses` must be a vector of `(prompt_type, item_text, response_text)`.
+
+Returns `(raw_output::Vector{String}, binary::Vector{Union{Int,Missing}})`.
+
+If `csv_file` is set, saves a CSV with prompt_type, item, raw classifier output, 
+and parsed labels.
 """
 function classify_responses_llm(
-    responses_text::Vector{String};
+    responses::Vector{Tuple{String,String,String}};
     model::String="gemma:2b",
     csv_file::Union{Nothing,String}=nothing
 )
-
-    n = length(responses_text)
+    n = length(responses)
     raw_output = Vector{String}(undef, n)
     binary = Vector{Union{Int,Missing}}(undef, n)
 
-    # Build prompt for single-line classification per response
     for i in 1:n
-        response = responses_text[i]
+        ptype, item, response = responses[i]
 
-        messages = [
-            PromptingTools.SystemMessage(
-                "You are a strict text classifier. For the response below, output exactly one number: 0 for no/reject, 1 for yes/approve. Do NOT add explanations or extra characters."
-            ),
-            PromptingTools.UserMessage(response)
-        ]
+        messages = LLMBiasData.get_prompt(ptype, item)
+        push!(messages, PromptingTools.UserMessage(response))
 
         ai_response = PromptingTools.aigenerate(
             ollama_schema,
@@ -45,23 +49,25 @@ function classify_responses_llm(
             api_kwargs=(url="http://localhost",)
         )
 
-        raw_text = strip(ai_response.content)
-        raw_output[i] = raw_text
+        clean_text = strip(replace(ai_response.content, r"[\n\r\f]+" => " "))
+        raw_output[i] = clean_text
 
         # Parse first integer found, else missing
-        val = tryparse(Int, first(split(raw_text, r"[^\d]+")))
+        val = tryparse(Int, first(split(clean_text, r"[^\d]+")))
         if isnothing(val)
-            @warn "Classifier returned unparseable response at index $i: '$raw_text'"
+            @warn "Classifier returned unparseable response at index $i: '$clean_text'\nOrig content: $(response)"
             binary[i] = missing
         else
             binary[i] = val
+            @info "PromptType: $(ptype)\nItem: $(item)\nOrig: $(response)\nResp: $(ai_response.content)\nClass: $(val)"
         end
     end
 
-    # Optional CSV for auditing
     if csv_file !== nothing
         df = DataFrames.DataFrame(
-            response_text=responses_text,
+            prompt_type=getindex.(responses, 1),
+            item_text=getindex.(responses, 2),
+            response_text=getindex.(responses, 3),
             classifier_output=raw_output,
             response_bin=binary
         )

@@ -38,7 +38,7 @@ function classify_responses_llm(
     for i in 1:n
         ptype, item, response = responses[i]
 
-        messages = LLMBiasData.get_prompt(ptype, item)
+        messages = LLMBiasData.get_judge_prompt(ptype, item)
         push!(messages, PromptingTools.UserMessage(response))
 
         ai_response = PromptingTools.aigenerate(

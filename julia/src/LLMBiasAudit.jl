@@ -37,7 +37,7 @@ function generate_prompts(demographics::Vector{LLMBiasData.Demographic},
     prompt_info = Vector{Tuple{String,String}}()  # store metadata as tuple (prompt_type, item_text)
 
     for demo in demographics, (ptype, item_text) in items
-        push!(prompts, LLMBiasData.get_prompt(ptype, "$(demo.name) applying $item_text"))
+        push!(prompts, LLMBiasData.get_judge_prompt(ptype, "$(demo.name) applying $item_text"))
         push!(prompt_info, (ptype, item_text))
     end
 

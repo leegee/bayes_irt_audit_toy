@@ -5,18 +5,18 @@ import JLD2
 import CSV
 import DataFrames
 
-# --- Directories ---
-isdir("csv") || mkdir("csv")
-isdir("jld2") || mkdir("jld2")
-isdir("plots") || mkdir("plots")
-
 include("LLMBiasAudit.jl")
 import .LLMBiasAudit
 
 include("IRTChainPlots.jl")
 import .IRTChainPlots
 
-plot_prefix = "output/plots/audit_results"
+const run_dir = "output";
+plot_prefix = "$(run_dir)/plots/audit_results"
+
+isdir("$(run_dir)/csv") || mkdir("$(run_dir)/csv")
+isdir("$(run_dir)/jld2") || mkdir("$(run_dir)/jld2")
+isdir("$(run_dir)/plots") || mkdir("$(run_dir)/plots")
 
 # Load IRT chains, demographics, items ---
 all_chains_datafile_path = "output/jld2/irt_all_chains.jld2"
@@ -48,7 +48,7 @@ for (model_name, chain) in all_chains
 
     # Summary CSV for θ
     summary_df = IRTChainPlots.summarize_irt_chain(chain; param=:θ)
-    csv_file = "csv/summary_$(safe_name)_theta.csv"
+    csv_file = "$(plot_prefix)/summary_$(safe_name)_theta.csv"
     CSV.write(csv_file, summary_df)
     @info("Saved θ summary CSV: $csv_file")
 end

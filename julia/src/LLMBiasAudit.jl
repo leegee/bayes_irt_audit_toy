@@ -30,11 +30,10 @@ const default_models = [
 
 const ollama_schema = PromptingTools.OllamaSchema()
 
-# Generate prompts as Message arrays 
 function generate_prompts(demographics::Vector{LLMBiasData.Demographic},
     items::Vector{Tuple{String,String}})
     prompts = Vector{Vector}()
-    prompt_info = Vector{Tuple{String,String}}()  # store metadata asp tuple (prompt_type, item_text)
+    prompt_info = Vector{Tuple{String,String}}()  # (prompt_type, item_text)
 
     for demo in demographics, (ptype, item_text) in items
         push!(prompts, LLMBiasData.get_auditable_prompt(ptype, "$(demo.name) applying $item_text"))
@@ -44,12 +43,7 @@ function generate_prompts(demographics::Vector{LLMBiasData.Demographic},
     return prompts, prompt_info
 end
 
-# Main LLM query 
-function query_ollama_client(
-    prompts::Vector{Vector};
-    model::String="gemma:2b",
-    max_tokens::Int=50
-)
+function perform_audit_query(prompts::Vector{Vector}; model::String="gemma:2b", max_tokens::Int=50)
     n = length(prompts)
     responses = Vector{String}(undef, n)
 
@@ -69,56 +63,52 @@ function query_ollama_client(
     return responses
 end
 
+function response_csv_fiepath(model_name::String)
+    safe_model_name = replace(model_name, r"[^\w:]" => "_")
+    "csv/responses_$(safe_model_name)_raw.csv"
+end
 
-function main(; models=default_models, use_cache::Bool=true)
-    @info("LLMBiasAudit.main enter")
-    demographics = LLMBiasData.define_demographics()
-    items = LLMBiasData.define_items()
-
-    prompts, prompt_info = generate_prompts(demographics, items)
-
+function load_or_query_models(models::Vector{String}, prompts, prompt_info, use_cache::Bool)
     all_responses_raw = Dict{String,Vector{String}}()
-    all_responses_bin = Dict{String,Vector{Int}}()
-    all_chains = Dict{String,Any}()
 
     for model_name in models
-        @info("Running model $(model_name)")
-        safe_model_name = replace(model_name, r"[^A-Za-z0-9:]" => "_")
-        filename_csv = "csv/responses_$(safe_model_name).csv"
-        filename_cache = "csv/responses_$(safe_model_name)_raw.csv"
-        filename_chain = "jld2/irt_chain_$(safe_model_name).jld2"
+        @info("Processing model $(model_name)")
+        filename_cached = response_csv_fiepath(model_name)
 
-        # Load cache
-        if use_cache && isfile(filename_cache)
-            df_cache = CSV.read(filename_cache, DataFrames.DataFrame)
+        if use_cache && isfile(filename_cached)
+            df_cache = CSV.read(filename_cached, DataFrames.DataFrame)
             verbose_responses = df_cache.response_text
             @info("Loaded cached verbose responses for $(model_name).")
         else
-            verbose_responses = query_ollama_client(prompts; model=model_name)
-            CSV.write(filename_cache, DataFrames.DataFrame(prompt=prompt_info, response_text=verbose_responses))
+            verbose_responses = perform_audit_query(prompts; model=model_name)
+            CSV.write(filename_cached, DataFrames.DataFrame(prompt=prompt_info, response_text=verbose_responses))
             @info("Saved raw verbose responses to cache for $(model_name).")
         end
-        all_responses_raw[model_name] = verbose_responses
 
-        # Prepare tuples for classifier
+        all_responses_raw[model_name] = verbose_responses
+    end
+
+    return all_responses_raw
+end
+
+function classify_and_save(models::Vector{String}, prompt_info, all_responses_raw)
+    all_responses_bin = Dict{String,Vector{Int}}()
+
+    for model_name in models
+        @info("Classifying responses for $(model_name)")
+        verbose_responses = all_responses_raw[model_name]
         response_tuples = [(ptype, item, resp) for ((ptype, item), resp) in zip(prompt_info, verbose_responses)]
 
-        # Classify
-        raw_class_output, responses_bin_union = ResponseClassifier.classify_responses_llm(
+        raw_class_output, responses_bin = ResponseClassifier.classify_responses_llm(
             response_tuples;
             model=smallest_model
         )
 
-        # Convert missing -> 0
-        responses_bin = [ismissing(x) ? 0 : x for x in responses_bin_union]
-        n_missing = count(ismissing, responses_bin_union)
-        if n_missing > 0
-            @warn "Model $(model_name): $n_missing missing labels replaced with 0 in IRT input."
-        end
         all_responses_bin[model_name] = responses_bin
-        @info("Binary labels processed for IRT.")
 
         # Save CSV
+        safe_model_name = replace(model_name, r"[^\w:]" => "_")
+        filename_csv = "csv/responses_$(safe_model_name).csv"
         CSV.write(filename_csv,
             DataFrames.DataFrame(
                 prompt_type=getindex.(response_tuples, 1),
@@ -129,14 +119,42 @@ function main(; models=default_models, use_cache::Bool=true)
             )
         )
         @info("Responses saved to '$(filename_csv)'")
+    end
 
-        # Fit IRT
+    return all_responses_bin
+end
+
+function fit_irt_models_and_save(models::Vector{String}, demographics, items, all_responses_bin)
+    all_chains = Dict{String,Any}()
+
+    for model_name in models
+        @info("Fitting IRT for $(model_name)")
+        responses_bin = all_responses_bin[model_name]
+
         response_matrix = reshape(responses_bin, length(demographics), length(items))
         chain = IRT.fit_irt_model(response_matrix)
+
+        safe_model_name = replace(model_name, r"[^\w:]" => "_")
+        filename_chain = "jld2/irt_chain_$(safe_model_name).jld2"
         JLD2.@save filename_chain chain
         @info("IRT chain saved to '$(filename_chain)'")
+
         all_chains[model_name] = chain
     end
+
+    return all_chains
+end
+
+function main(; models=default_models, use_cache::Bool=true)
+    @info("LLMBiasAudit.main enter")
+
+    demographics = LLMBiasData.define_demographics()
+    items = LLMBiasData.define_items()
+    prompts, prompt_info = generate_prompts(demographics, items)
+
+    all_responses_raw = load_or_query_models(models, prompts, prompt_info, use_cache)
+    all_responses_bin = classify_and_save(models, prompt_info, all_responses_raw)
+    all_chains = fit_irt_models_and_save(models, demographics, items, all_responses_bin)
 
     # Save all chains
     JLD2.@save all_chains_datafile_path all_chains demographics items

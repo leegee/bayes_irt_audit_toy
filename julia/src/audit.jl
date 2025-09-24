@@ -21,5 +21,5 @@ LLMBiasAudit.main(
     #     "phi3:latest",
     # ],
     run_dir="output",
-    use_cache=true
+    use_cache=false
 )

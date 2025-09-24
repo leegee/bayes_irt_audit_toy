@@ -31,36 +31,52 @@ const default_models = [
 const ollama_schema = PromptingTools.OllamaSchema()
 
 function perform_audit_query(prompts::Vector{Vector}; model::String="gemma:2b", max_tokens::Int=50)
+    lock_obj = ReentrantLock()
     n = length(prompts)
     responses = Vector{String}(undef, n)
 
     println("Running LLM queries individually (unbatched) on $(model)...")
     Threads.@threads for i in 1:n
-        @info "prompt $(i) / $(n): $(prompts[i])"
-        response = PromptingTools.aigenerate(
-            ollama_schema,
-            prompts[i];
-            model=model,
-            max_tokens=max_tokens,
-            api_kwargs=(url="http://localhost",)
-        )
-        responses[i] = strip(replace(response.content, r"[\n\r\f]+" => " "))
+        try
+            prompt = prompts[i]
+            @debug "prompt $(i)/$(n): $(prompt)"
+
+            response = PromptingTools.aigenerate(
+                ollama_schema,
+                prompt;
+                model=model,
+                max_tokens=max_tokens,
+                api_kwargs=(url="http://localhost",)
+            )
+
+            result = ""
+            if response !== nothing && hasproperty(response, :content) && !isempty(response.content)
+                result = strip(replace(response.content, r"[\n\r\f]+" => " "))
+            end
+
+            # thread-safe assignment
+            lock(lock_obj) do
+                responses[i] = result
+            end
+
+        catch e
+            lock(lock_obj) do
+                responses[i] = ""
+            end
+            @warn "LLM query failed for prompt $(i): $e"
+        end
     end
 
     return responses
 end
 
-function response_csv_fiepath(run_dir::String, model_name::String)
-    safe_model_name = replace(model_name, r"[^\w:]" => "_")
-    "$(run_dir)/csv/responses_$(safe_model_name)_raw.csv"
-end
 
 function load_or_query_models(models::Vector{String}, run_dir, prompts, prompt_info, use_cache::Bool)
     all_responses_raw = Dict{String,Vector{String}}()
 
     for model_name in models
         @info("Processing model $(model_name)")
-        filename_cached = response_csv_fiepath(run_dir, model_name)
+        filename_cached = "$(run_dir)/csv/responses_$(replace(model_name, r"[^\w]" => "_"))_raw.csv"
 
         if use_cache && isfile(filename_cached)
             df_cache = CSV.read(filename_cached, DataFrames.DataFrame)
@@ -69,6 +85,8 @@ function load_or_query_models(models::Vector{String}, run_dir, prompts, prompt_i
             @info("Loaded columns:", DataFrames.names(df_cache))
         else
             verbose_responses = perform_audit_query(prompts; model=model_name)
+            @info "First 5 responses: ", verbose_responses[1:min(5, end)]
+
             CSV.write(filename_cached, DataFrames.DataFrame(prompt=prompt_info, response_text=verbose_responses))
             @info("Saved raw verbose responses to cache for $(model_name).")
         end
@@ -95,7 +113,7 @@ function classify_and_save(models::Vector{String}, prompt_info, all_responses_ra
         all_responses_bin[model_name] = responses_bin
 
         # Save CSV
-        safe_model_name = replace(model_name, r"[^\w:]" => "_")
+        safe_model_name = replace(model_name, r"[^\w]" => "_")
         filename_csv = "$(run_dir)/csv/responses_$(safe_model_name).csv"
         CSV.write(filename_csv,
             DataFrames.DataFrame(

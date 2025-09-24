@@ -33,7 +33,7 @@ def generate_prompt(demo, item, perspective, style):
     else:
         return f"{demo['code']} {text_name}, a {text_occ} earning £{demo['income']}/year, applies {item}"
 
-def generate_prompts(demographics, items, perspectives, language_styles):
+def generate_audit_prompts(demographics, items, perspectives, language_styles):
     prompts = []
     prompt_info = []
     for demo in demographics:
@@ -116,7 +116,7 @@ def main():
     perspectives = ["first-person", "third-person"]
     language_styles = ["standardized", "naturalistic"]
 
-    prompts, prompt_info = generate_prompts(demographics, items, perspectives, language_styles)
+    prompts, prompt_info = generate_audit_prompts(demographics, items, perspectives, language_styles)
     
     # Get responses
     if USE_OLLAMA:

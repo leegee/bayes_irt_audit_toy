@@ -15,7 +15,7 @@ import PromptingTools
 import JLD2
 import Base.Threads
 
-export main, all_chains_datafile_path
+export main, default_models, all_chains_datafile_path
 
 PromptingTools.OPENAI_API_KEY = ""
 
@@ -30,26 +30,13 @@ const default_models = [
 
 const ollama_schema = PromptingTools.OllamaSchema()
 
-function generate_prompts(demographics::Vector{LLMBiasData.Demographic},
-    items::Vector{Tuple{String,String}})
-    prompts = Vector{Vector}()
-    prompt_info = Vector{Tuple{String,String}}()  # (prompt_type, item_text)
-
-    for demo in demographics, (ptype, item_text) in items
-        push!(prompts, LLMBiasData.get_auditable_prompt(ptype, "$(demo.name) applying $item_text"))
-        push!(prompt_info, (ptype, item_text))
-    end
-
-    return prompts, prompt_info
-end
-
 function perform_audit_query(prompts::Vector{Vector}; model::String="gemma:2b", max_tokens::Int=50)
     n = length(prompts)
     responses = Vector{String}(undef, n)
 
     println("Running LLM queries individually (unbatched) on $(model)...")
     Threads.@threads for i in 1:n
-        @info "prompt $(i) / $(n)"
+        @info "prompt $(i) / $(n): $(prompts[i])"
         response = PromptingTools.aigenerate(
             ollama_schema,
             prompts[i];
@@ -91,7 +78,7 @@ function load_or_query_models(models::Vector{String}, prompts, prompt_info, use_
     return all_responses_raw
 end
 
-function classify_and_save(models::Vector{String}, prompt_info, all_responses_raw)
+function classify_and_save(models::Vector{String}, prompt_info, all_responses_raw, demographics, items)
     all_responses_bin = Dict{String,Vector{Int}}()
 
     for model_name in models
@@ -111,6 +98,7 @@ function classify_and_save(models::Vector{String}, prompt_info, all_responses_ra
         filename_csv = "csv/responses_$(safe_model_name).csv"
         CSV.write(filename_csv,
             DataFrames.DataFrame(
+                demographic=[demo.name for demo in demographics for _ in items],
                 prompt_type=getindex.(response_tuples, 1),
                 item_text=getindex.(response_tuples, 2),
                 response_text=getindex.(response_tuples, 3),
@@ -150,10 +138,10 @@ function main(; models=default_models, use_cache::Bool=true)
 
     demographics = LLMBiasData.define_demographics()
     items = LLMBiasData.define_items()
-    prompts, prompt_info = generate_prompts(demographics, items)
+    prompts, prompt_info = LLMBiasData.generate_audit_prompts(demographics, items)
 
     all_responses_raw = load_or_query_models(models, prompts, prompt_info, use_cache)
-    all_responses_bin = classify_and_save(models, prompt_info, all_responses_raw)
+    all_responses_bin = classify_and_save(models, prompt_info, all_responses_raw, demographics, items)
     all_chains = fit_irt_models_and_save(models, demographics, items, all_responses_bin)
 
     # Save all chains

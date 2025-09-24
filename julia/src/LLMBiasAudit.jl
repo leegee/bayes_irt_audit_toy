@@ -20,7 +20,7 @@ export main, default_models, all_chains_datafile_path
 PromptingTools.OPENAI_API_KEY = ""
 
 const smallest_model = "gemma:2b"
-const all_chains_datafile_path = "jld2/irt_all_chains.jld2"
+
 const default_models = [
     "gemma:2b",
     "phi3:latest",
@@ -50,17 +50,17 @@ function perform_audit_query(prompts::Vector{Vector}; model::String="gemma:2b", 
     return responses
 end
 
-function response_csv_fiepath(model_name::String)
+function response_csv_fiepath(run_dir::String, model_name::String)
     safe_model_name = replace(model_name, r"[^\w:]" => "_")
-    "csv/responses_$(safe_model_name)_raw.csv"
+    "$(run_dir)/csv/responses_$(safe_model_name)_raw.csv"
 end
 
-function load_or_query_models(models::Vector{String}, prompts, prompt_info, use_cache::Bool)
+function load_or_query_models(models::Vector{String}, run_dir, prompts, prompt_info, use_cache::Bool)
     all_responses_raw = Dict{String,Vector{String}}()
 
     for model_name in models
         @info("Processing model $(model_name)")
-        filename_cached = response_csv_fiepath(model_name)
+        filename_cached = response_csv_fiepath(run_dir, model_name)
 
         if use_cache && isfile(filename_cached)
             df_cache = CSV.read(filename_cached, DataFrames.DataFrame)
@@ -78,7 +78,7 @@ function load_or_query_models(models::Vector{String}, prompts, prompt_info, use_
     return all_responses_raw
 end
 
-function classify_and_save(models::Vector{String}, prompt_info, all_responses_raw, demographics, items)
+function classify_and_save(models::Vector{String}, prompt_info, all_responses_raw, run_dir, demographics, items)
     all_responses_bin = Dict{String,Vector{Int}}()
 
     for model_name in models
@@ -95,7 +95,7 @@ function classify_and_save(models::Vector{String}, prompt_info, all_responses_ra
 
         # Save CSV
         safe_model_name = replace(model_name, r"[^\w:]" => "_")
-        filename_csv = "csv/responses_$(safe_model_name).csv"
+        filename_csv = "$(run_dir)/csv/responses_$(safe_model_name).csv"
         CSV.write(filename_csv,
             DataFrames.DataFrame(
                 demographic=[demo.name for demo in demographics for _ in items],
@@ -112,7 +112,7 @@ function classify_and_save(models::Vector{String}, prompt_info, all_responses_ra
     return all_responses_bin
 end
 
-function fit_irt_models_and_save(models::Vector{String}, demographics, items, all_responses_bin)
+function fit_irt_models_and_save(models::Vector{String}, run_dir, demographics, items, all_responses_bin)
     all_chains = Dict{String,Any}()
 
     for model_name in models
@@ -123,7 +123,7 @@ function fit_irt_models_and_save(models::Vector{String}, demographics, items, al
         chain = IRT.fit_irt_model(response_matrix)
 
         safe_model_name = replace(model_name, r"[^\w:]" => "_")
-        filename_chain = "jld2/irt_chain_$(safe_model_name).jld2"
+        filename_chain = "$(run_dir)/jld2/irt_chain_$(safe_model_name).jld2"
         JLD2.@save filename_chain chain
         @info("IRT chain saved to '$(filename_chain)'")
 
@@ -133,16 +133,17 @@ function fit_irt_models_and_save(models::Vector{String}, demographics, items, al
     return all_chains
 end
 
-function main(; models=default_models, use_cache::Bool=true)
-    @info("LLMBiasAudit.main enter")
+function main(; models=default_models, run_dir="output", use_cache::Bool=true)
+    @info("LLMBiasAudit.main enter: use_cache: $(use_cache), run_dir=$(run_dir), models=$(models)")
+    all_chains_datafile_path = "$(run_dir)/jld2/irt_all_chains.jld2"
 
     demographics = LLMBiasData.define_demographics()
     items = LLMBiasData.define_items()
     prompts, prompt_info = LLMBiasData.generate_audit_prompts(demographics, items)
 
-    all_responses_raw = load_or_query_models(models, prompts, prompt_info, use_cache)
-    all_responses_bin = classify_and_save(models, prompt_info, all_responses_raw, demographics, items)
-    all_chains = fit_irt_models_and_save(models, demographics, items, all_responses_bin)
+    all_responses_raw = load_or_query_models(models, run_dir, prompts, prompt_info, use_cache)
+    all_responses_bin = classify_and_save(models, run_dir, prompt_info, all_responses_raw, demographics, items)
+    all_chains = fit_irt_models_and_save(models, run_dir, demographics, items, all_responses_bin)
 
     # Save all chains
     JLD2.@save all_chains_datafile_path all_chains demographics items

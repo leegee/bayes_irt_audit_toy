@@ -1,4 +1,2 @@
 .venv
-julia/csv
-julia/jld2
-julia/plots
+julia/output

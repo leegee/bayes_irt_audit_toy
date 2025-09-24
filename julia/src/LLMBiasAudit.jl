@@ -66,6 +66,7 @@ function load_or_query_models(models::Vector{String}, run_dir, prompts, prompt_i
             df_cache = CSV.read(filename_cached, DataFrames.DataFrame)
             verbose_responses = df_cache.response_text
             @info("Loaded cached verbose responses for $(model_name).")
+            @info("Loaded columns:", DataFrames.names(df_cache))
         else
             verbose_responses = perform_audit_query(prompts; model=model_name)
             CSV.write(filename_cached, DataFrames.DataFrame(prompt=prompt_info, response_text=verbose_responses))

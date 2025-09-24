@@ -20,6 +20,6 @@ LLMBiasAudit.main(
     #     "gemma:2b",
     #     "phi3:latest",
     # ],
-    run_dir='run',
+    run_dir="output",
     use_cache=true
 )

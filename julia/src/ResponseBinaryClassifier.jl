@@ -12,12 +12,12 @@ PromptingTools.OPENAI_API_KEY = ""
 const ollama_schema = PromptingTools.OllamaSchema()
 
 """
-    classify_responses_llm(responses::Vector{Tuple{String,String,String}};
+    classify_responses_llm(responses::Vector{Tuple{String,String,String}}; 
                            model::String="gemma:2b",
                            csv_file::Union{Nothing,String}=nothing)
 
-Classify verbose LLM responses into 0 (non-definitive) or 1 (definitive decision) 
-using a small LLM. 
+Classify verbose LLM responses into 0 (definitive Yes/No) or 1 (non-definitive / Unsure) 
+using a small LLM.
 
 `responses` must be a vector of `(prompt_type, item_text, response_text)`.
 
@@ -38,9 +38,10 @@ function classify_responses_llm(
     for i in 1:n
         ptype, item, response = responses[i]
 
-        messages = LLMBiasData.get_categoriser_prompt(ptype, item)
-        push!(messages, PromptingTools.UserMessage(response))
+        # Build categorizer prompt
+        messages = LLMBiasData.get_categoriser_prompt(ptype, response)
 
+        # Generate classification via LLM
         ai_response = PromptingTools.aigenerate(
             ollama_schema,
             messages;
@@ -52,16 +53,35 @@ function classify_responses_llm(
         clean_text = strip(replace(ai_response.content, r"[\n\r\f]+" => " "))
         raw_output[i] = clean_text
 
-        # Parse first integer found, else missing
-        val = tryparse(Int, first(split(clean_text, r"[^\d]+")))
-        if isnothing(val)
-            @warn "Classifier returned unparseable response at index $i: '$clean_text'\nOrig content: $(response)"
-            binary[i] = missing
-        else
-            binary[i] = val
-            @info "# PROMPTTYPE: $(ptype)\n# QUESTION: $(item)\n# ORIG RESPONSE: $(response)\n# CLASSIFIER: $(ai_response.content)\n# FINAL: $(val)"
+        # Try first parsing the first numeric 
+        val = nothing
+        for s in split(clean_text, r"[^\d]+")
+            if !isempty(s)
+                val = tryparse(Int, s)
+                if val !== nothing
+                    break
+                end
+            end
         end
 
+        # Fallback textual mapping
+        if isnothing(val)
+            @warn "Classifier did not return a parsable number"
+            lc = lowercase(clean_text)
+            if occursin("yes", lc) || occursin("no", lc)
+                val = 0
+            elseif occursin("unsure", lc)
+                val = 1
+            else
+                @warn "Classifier unparseable at index $i: '$clean_text'\nOriginal: $(response)"
+                binary[i] = missing
+                continue
+            end
+        end
+
+        binary[i] = val
+
+        @info "# PROMPTTYPE: $(ptype)\n# QUESTION: $(item)\n# ORIG RESPONSE: $(response)\n# CLASSIFIER: $(ai_response.content)\n# FINAL: $(val)"
         @info "-------------------------------------------"
     end
 

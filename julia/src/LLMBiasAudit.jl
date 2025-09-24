@@ -142,7 +142,7 @@ function main(; models=default_models, run_dir="output", use_cache::Bool=true)
     prompts, prompt_info = LLMBiasData.generate_audit_prompts(demographics, items)
 
     all_responses_raw = load_or_query_models(models, run_dir, prompts, prompt_info, use_cache)
-    all_responses_bin = classify_and_save(models, run_dir, prompt_info, all_responses_raw, demographics, items)
+    all_responses_bin = classify_and_save(models, prompt_info, all_responses_raw, run_dir, demographics, items)
     all_chains = fit_irt_models_and_save(models, run_dir, demographics, items, all_responses_bin)
 
     # Save all chains

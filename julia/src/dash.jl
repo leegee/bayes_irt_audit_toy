@@ -11,30 +11,26 @@ import Dash
 import Logging: @error
 import FilePathsBase: mkpath
 
-# -----------------------------
-# Configurable base output directory
-# -----------------------------
-const OUTPUT_BASE_DIR = "output"   # <-- change this to redirect all output
+const OUTPUT_BASE_DIR = "output"
 mkpath(OUTPUT_BASE_DIR)
 mkpath(joinpath(OUTPUT_BASE_DIR, "csv"))
 mkpath(joinpath(OUTPUT_BASE_DIR, "plots"))
 
-# -----------------------------
-# Load CSV for a model
-# -----------------------------
+safe_filename(model_name::String) = replace(model_name, r"[^\w]" => "_")
+
 function load_model_csv(model_name::String; classified::Bool=true)
-    safe_name = replace(model_name, r"[^\w:]" => "_")
-    file_path = classified ? joinpath(OUTPUT_BASE_DIR, "csv", "responses_$(safe_name).csv") :
-                joinpath(OUTPUT_BASE_DIR, "csv", "responses_$(safe_name)_raw.csv")
+    file_name = classified ? "responses_$(safe_filename(model_name)).csv" :
+                "responses_$(safe_filename(model_name))_raw.csv"
+    file_path = joinpath(OUTPUT_BASE_DIR, "csv", file_name)
+    if !isfile(file_path)
+        @error "CSV file does not exist" file_path
+        return DataFrame()  # return empty DataFrame instead of failing
+    end
     CSV.read(file_path, DataFrame)
 end
 
-# -----------------------------
-# Static binary heatmap
-# -----------------------------
 function plot_binary_heatmap(df::DataFrame, model_name::String)
     heatmap_df = unstack(df, :demographic, :item_text, :response_bin)
-
     mat = Matrix{Union{Missing,Int}}(heatmap_df[:, Not(:demographic)])
     mat = coalesce.(mat, 0)
 
@@ -48,12 +44,8 @@ function plot_binary_heatmap(df::DataFrame, model_name::String)
     )
 end
 
-# -----------------------------
-# Interactive heatmap
-# -----------------------------
 function plot_interactive_heatmap(df::DataFrame, model_name::String)
     heatmap_df = unstack(df, :demographic, :item_text, :response_bin)
-
     mat = Matrix{Union{Missing,Int}}(heatmap_df[:, Not(:demographic)])
     mat = coalesce.(mat, 0)
 
@@ -71,9 +63,7 @@ function plot_interactive_heatmap(df::DataFrame, model_name::String)
     PlotlyJS.plot(trace)
 end
 
-# -----------------------------
 # Interactive raw text table (Dash)
-# -----------------------------
 function run_dash_table(df::DataFrame)
     app = Dash.dash()
 
@@ -101,6 +91,10 @@ function run_dash_table(df::DataFrame)
         Dash.Input("item-filter", "value")
     ) do selected_demos, selected_items
         try
+            # Default to empty arrays if nothing was selected yet
+            selected_demos = isnothing(selected_demos) ? String[] : selected_demos
+            selected_items = isnothing(selected_items) ? String[] : selected_items
+
             mask = trues(nrow(df))
             if !isempty(selected_demos)
                 mask .&= in.(df.demographic, Ref(selected_demos))
@@ -110,10 +104,12 @@ function run_dash_table(df::DataFrame)
             end
             filtered = df[mask, :]
 
-            return Dash.html_table(
-                [Dash.html_tr([Dash.html_th(col) for col in names(filtered)])] .++
-                [Dash.html_tr([Dash.html_td(filtered[row, col]) for col in names(filtered)])
-                 for row in 1:nrow(filtered)]
+            Dash.html_table(
+                vcat(
+                    [Dash.html_tr([Dash.html_th(col) for col in names(filtered)])],
+                    [Dash.html_tr([Dash.html_td(filtered[row, col]) for col in names(filtered)])
+                     for row in 1:nrow(filtered)]
+                )
             )
         catch e
             @error "Dash callback error" exception = (e, catch_backtrace())
@@ -124,12 +120,13 @@ function run_dash_table(df::DataFrame)
     Dash.run_server(app, "127.0.0.1"; debug=true)
 end
 
-# -----------------------------
-# Main dashboard
-# -----------------------------
 function main(; classified::Bool=true)
     for model in LLMBiasAudit.default_models
         df = load_model_csv(model; classified=classified)
+        if nrow(df) == 0
+            @error "Skipping model due to missing CSV" model
+            continue
+        end
         println("Plotting static heatmap for ", model)
         plot_binary_heatmap(df, model)
         println("Plotting interactive heatmap for ", model)

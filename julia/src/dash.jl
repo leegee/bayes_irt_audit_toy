@@ -218,11 +218,41 @@ function run_dash_app()
         filtered = df[mask, :]
 
         # Table
-        table_component = Dash.html_table(
-            vcat(
-                [Dash.html_tr([Dash.html_th(col) for col in names(filtered)])],
-                [Dash.html_tr([Dash.html_td(filtered[row, col]) for col in names(filtered)]) for row in 1:nrow(filtered)]
-            )
+        # table_component = Dash.html_table(
+        #     vcat(
+        #         [Dash.html_tr([Dash.html_th(col) for col in names(filtered)])],
+        #         [Dash.html_tr([Dash.html_td(filtered[row, col]) for col in names(filtered)]) for row in 1:nrow(filtered)]
+        #     )
+        # )
+        # Replace your manual table_component with this
+        table_component = Dash.dash_datatable(
+            id="data-table",
+            columns=[Dict("name" => col, "id" => col) for col in names(filtered)],
+            data=Dict.(pairs.(eachrow(filtered))),
+            sort_action="native",     # click headers to sort
+            filter_action="native",
+            page_size=100,
+            style_table=Dict("overflowX" => "auto", "width" => "100%"),
+            style_cell=Dict(
+                "whiteSpace" => "normal",
+                "height" => "auto",
+                "lineHeight" => "1.2",
+                "textAlign" => "left",
+                "backgroundColor" => "#1e1e1e",
+                "color" => "#e0e0e0",
+                "border" => "1px solid #333",
+                "padding" => "6px",
+                "minWidth" => 0,
+                "maxWidth" => "auto",
+                "width" => "auto"
+            ),
+            style_header=Dict(
+                "backgroundColor" => "#2a2a2a",
+                "color" => "#e0e0e0"
+            ),
+            style_data_conditional=[
+                Dict("if" => Dict("row_index" => "even"), "backgroundColor" => "#181818")
+            ]
         )
 
         # Figures (both reflect the filtered table)

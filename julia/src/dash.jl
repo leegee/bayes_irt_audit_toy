@@ -153,8 +153,17 @@ function run_dash_app()
         else
             combined_df = all_models_data[selected_model]
         end
-        demo_opts = [Dict("label" => d, "value" => d) for d in unique(combined_df.demographic)]
-        item_opts = [Dict("label" => i, "value" => i) for i in unique(combined_df.item_text)]
+
+        demo_opts = [
+            Dict("label" => "All", "value" => "__ALL__");
+            [Dict("label" => d, "value" => d) for d in unique(combined_df.demographic)]
+        ]
+
+        item_opts = [
+            Dict("label" => "All", "value" => "__ALL__");
+            [Dict("label" => i, "value" => i) for i in unique(combined_df.item_text)]
+        ]
+
         return demo_opts, item_opts
     end
 
@@ -179,12 +188,19 @@ function run_dash_app()
         end
 
         mask = trues(nrow(df))
-        if !isempty(selected_demos)
+
+        if "__ALL__" in selected_demos
+            mask .&= trues(nrow(df))  # ignore demo filter
+        elseif !isempty(selected_demos)
             mask .&= in.(df.demographic, Ref(selected_demos))
         end
-        if !isempty(selected_items)
+
+        if "__ALL__" in selected_items
+            mask .&= trues(nrow(df))  # ignore item filter
+        elseif !isempty(selected_items)
             mask .&= in.(df.item_text, Ref(selected_items))
         end
+
         filtered = df[mask, :]
 
         table_component = Dash.html_table(

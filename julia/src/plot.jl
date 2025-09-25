@@ -12,7 +12,7 @@ include("IRTChainPlots.jl")
 import .IRTChainPlots
 
 const run_dir = "output";
-plot_prefix = "$(run_dir)/plots/audit_results"
+plot_prefix = "$(run_dir)/plots/"
 
 isdir("$(run_dir)/csv") || mkdir("$(run_dir)/csv")
 isdir("$(run_dir)/jld2") || mkdir("$(run_dir)/jld2")

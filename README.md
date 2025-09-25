@@ -1,14 +1,12 @@
 An experimental toy to attempt an elementary audit of LLM bias by simulating scenarios with different demographic profiles and items.
 
-Results are analysed through Item Response Theory (IRT) and Baysian posterior sampling via NUTS/MCMC to achieve uncertainty estimates.
+Results are analysed through Item Response Theory (IRT) using Turing.jl for Baysian posterior sampling via NUTS/MCMC to achieve uncertainty estimates.
 
 Demographics: 𝜃𝑖 (latent “bias susceptibility” per person)
 
 Items: 𝑏𝑗 (difficulty of approving hiring, loans, etc.)
 
 Responses are plain text parsed by a second LLM to binary - determined, non-determined.
-
-Turing.jl performs Bayesian posterior sampling with NUTS/MCMC
 
 Result: chains for θ and b show which demographics/models are treated more/less favorably - and when the model specifies it needs more data.
 

@@ -14,10 +14,6 @@ import .IRTChainPlots
 const run_dir = "output";
 plot_prefix = "$(run_dir)/plots/"
 
-isdir("$(run_dir)/csv") || mkdir("$(run_dir)/csv")
-isdir("$(run_dir)/jld2") || mkdir("$(run_dir)/jld2")
-isdir("$(run_dir)/plots") || mkdir("$(run_dir)/plots")
-
 # Load IRT chains, demographics, items ---
 all_chains_datafile_path = "output/jld2/irt_all_chains.jld2"
 @info("Loading IRT chains from file: $all_chains_datafile_path")

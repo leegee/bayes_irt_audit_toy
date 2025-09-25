@@ -5,7 +5,7 @@ import .LLMBiasAudit
 
 import CSV
 import Dash
-import DataFrames: DataFrame, names, nrow
+import DataFrames: DataFrame, names, nrow, vcat
 import FilePathsBase: mkpath
 import JLD2
 import Logging: @error
@@ -33,7 +33,7 @@ function load_model_csv(model_name::String; classified::Bool=true)
     CSV.read(file_path, DataFrame)
 end
 
-# Fixed binary heatmap: long-format (only actual responses)
+# Binary heatmap (long-format)
 function plotly_binary_heatmap(df::DataFrame, model_name::String)
     hover_text = ["$(df.demographic[i]), $(df.item_text[i]): $(df.response_bin[i])" for i in 1:nrow(df)]
 
@@ -55,11 +55,12 @@ function plotly_binary_heatmap(df::DataFrame, model_name::String)
 end
 
 # Ability heatmap from JLD2
-function plotly_ability_heatmap(jld2_file; selected_demos=nothing, demo_names=nothing)
+function plotly_ability_heatmap(jld2_file; selected_demos=nothing, demo_names=nothing, selected_models=nothing)
     data = JLD2.load(jld2_file)
     all_chains = data["all_chains"]
     demographics = data["demographics"]
-    model_names = collect(keys(all_chains))
+
+    model_names = selected_models === nothing ? collect(keys(all_chains)) : selected_models
     full_demo_names = demo_names === nothing ? [d.name for d in demographics] : demo_names
     n_demo = length(full_demo_names)
 
@@ -106,10 +107,11 @@ function load_all_models()
     Dict(model => load_model_csv(model) for model in LLMBiasAudit.default_models)
 end
 
-# Full Dash app
+# Dash app
 function run_dash_app()
     all_models_data = load_all_models()
     model_names = collect(keys(all_models_data))
+    all_models_dropdown = ["All Models"; model_names]  # Add "All Models" option
 
     app = Dash.dash()
 
@@ -117,8 +119,8 @@ function run_dash_app()
         [
             Dash.dcc_dropdown(
                 id="model-filter",
-                options=[Dict("label" => m, "value" => m) for m in model_names],
-                value=first(model_names),
+                options=[Dict("label" => m, "value" => m) for m in all_models_dropdown],
+                value=first(all_models_dropdown),
                 clearable=false,
                 placeholder="Select model"
             ),
@@ -146,9 +148,13 @@ function run_dash_app()
         Dash.Output("item-filter", "options"),
         Dash.Input("model-filter", "value")
     ) do selected_model
-        df = all_models_data[selected_model]
-        demo_opts = [Dict("label" => d, "value" => d) for d in unique(df.demographic)]
-        item_opts = [Dict("label" => i, "value" => i) for i in unique(df.item_text)]
+        if selected_model == "All Models"
+            combined_df = vcat(values(all_models_data)...)
+        else
+            combined_df = all_models_data[selected_model]
+        end
+        demo_opts = [Dict("label" => d, "value" => d) for d in unique(combined_df.demographic)]
+        item_opts = [Dict("label" => i, "value" => i) for i in unique(combined_df.item_text)]
         return demo_opts, item_opts
     end
 
@@ -164,7 +170,13 @@ function run_dash_app()
         selected_demos = isnothing(selected_demos) ? String[] : selected_demos
         selected_items = isnothing(selected_items) ? String[] : selected_items
 
-        df = all_models_data[selected_model]
+        if selected_model == "All Models"
+            df = vcat(values(all_models_data)...)
+            models_for_heatmap = collect(keys(all_models_data))
+        else
+            df = all_models_data[selected_model]
+            models_for_heatmap = [selected_model]
+        end
 
         mask = trues(nrow(df))
         if !isempty(selected_demos)
@@ -183,7 +195,7 @@ function run_dash_app()
         )
 
         binary_fig = plotly_binary_heatmap(filtered, selected_model)
-        ability_fig = plotly_ability_heatmap(ALL_CHAINS_PATH; selected_demos=selected_demos)
+        ability_fig = plotly_ability_heatmap(ALL_CHAINS_PATH; selected_demos=selected_demos, selected_models=models_for_heatmap)
 
         return table_component, binary_fig, ability_fig
     end

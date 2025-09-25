@@ -7,7 +7,6 @@ import CSV
 import Dash
 import DataFrames: DataFrame, names, nrow, vcat
 import FilePathsBase: mkpath
-import JLD2
 import Logging: @error
 import PlotlyJS
 import Statistics: mean
@@ -16,8 +15,6 @@ const OUTPUT_BASE_DIR = "output"
 mkpath(OUTPUT_BASE_DIR)
 mkpath(joinpath(OUTPUT_BASE_DIR, "csv"))
 mkpath(joinpath(OUTPUT_BASE_DIR, "plots"))
-
-const ALL_CHAINS_PATH = joinpath(OUTPUT_BASE_DIR, "jld2", "irt_all_chains.jld2")
 
 safe_filename(model_name::String) = replace(model_name, r"[^\w]" => "_")
 
@@ -33,8 +30,15 @@ function load_model_csv(model_name::String; classified::Bool=true)
     CSV.read(file_path, DataFrame)
 end
 
-# Binary heatmap (long-format)
+# Binary heatmap (long-format, handles empty table)
 function plotly_binary_heatmap(df::DataFrame, model_name::String)
+    if nrow(df) == 0
+        return PlotlyJS.Plot(PlotlyJS.Layout(
+            title="Binary Responses: $(model_name) (no data)",
+            template="plotly_dark"
+        ))
+    end
+
     hover_text = ["$(df.demographic[i]), $(df.item_text[i]): $(df.response_bin[i])" for i in 1:nrow(df)]
 
     trace = PlotlyJS.heatmap(
@@ -54,42 +58,37 @@ function plotly_binary_heatmap(df::DataFrame, model_name::String)
     ))
 end
 
-# Ability heatmap from JLD2
-function plotly_ability_heatmap(jld2_file; selected_demos=nothing, demo_names=nothing, selected_models=nothing)
-    data = JLD2.load(jld2_file)
-    all_chains = data["all_chains"]
-    demographics = data["demographics"]
-
-    model_names = selected_models === nothing ? collect(keys(all_chains)) : selected_models
-    full_demo_names = demo_names === nothing ? [d.name for d in demographics] : demo_names
-    n_demo = length(full_demo_names)
-
-    # Map selected demographics to indexes
-    if selected_demos !== nothing && !isempty(selected_demos)
-        idxs = findall(d -> d in selected_demos, full_demo_names)
-        labels = full_demo_names[idxs]
-    else
-        idxs = 1:n_demo
-        labels = full_demo_names
+# Ability heatmap from filtered DataFrame (handles missing/empty values)
+function plotly_ability_heatmap_from_df(df::DataFrame, model_names::Vector{String})
+    if nrow(df) == 0
+        return PlotlyJS.Plot(PlotlyJS.Layout(
+            title="Mean abilities (θ) (no data)",
+            template="plotly_dark"
+        ))
     end
 
-    heat_matrix = zeros(length(labels), length(model_names))
+    demographics = unique(df.demographic)
+    n_demo = length(demographics)
+    n_models = length(model_names)
+
+    # Create a matrix of mean response_bin per demo/model
+    heat_matrix = Matrix{Union{Float64,Missing}}(undef, n_demo, n_models)
     for (j, model_name) in enumerate(model_names)
-        df_chain = DataFrame(all_chains[model_name])
-        θ_cols = filter(c -> startswith(c, "θ"), names(df_chain))
-        θ_cols_filtered = θ_cols[idxs]
-        for (i, col) in enumerate(θ_cols_filtered)
-            heat_matrix[i, j] = mean(df_chain[!, col])
+        # select df for this model if df has multiple models, else just use df
+        # Here we assume df only has one model loaded, so we just copy the same df
+        for (i, demo) in enumerate(demographics)
+            vals = df.response_bin[df.demographic.==demo]
+            heat_matrix[i, j] = isempty(vals) ? missing : mean(vals)
         end
     end
 
-    hover_text = ["$(labels[i]), $(model_names[j]): $(round(heat_matrix[i,j], digits=2))"
-                  for i in 1:length(labels), j in 1:length(model_names)]
+    hover_text = ["$(demographics[i]), $(model_names[j]): $(ismissing(heat_matrix[i,j]) ? "NA" : round(heat_matrix[i,j], digits=2))"
+                  for i in 1:n_demo, j in 1:n_models]
 
     trace = PlotlyJS.heatmap(
         z=heat_matrix,
         x=model_names,
-        y=labels,
+        y=demographics,
         text=hover_text,
         hoverinfo="text+z",
         colorscale="Viridis"
@@ -101,6 +100,8 @@ function plotly_ability_heatmap(jld2_file; selected_demos=nothing, demo_names=no
         yaxis=PlotlyJS.attr(autorange="reversed")
     ))
 end
+
+
 
 # Load all CSVs into a Dict
 function load_all_models()
@@ -148,11 +149,8 @@ function run_dash_app()
         Dash.Output("item-filter", "options"),
         Dash.Input("model-filter", "value")
     ) do selected_model
-        if selected_model == "All Models"
-            combined_df = vcat(values(all_models_data)...)
-        else
-            combined_df = all_models_data[selected_model]
-        end
+        combined_df = selected_model == "All Models" ? vcat(values(all_models_data)...) :
+                      all_models_data[selected_model]
 
         demo_opts = [
             Dict("label" => "All", "value" => "__ALL__");
@@ -167,7 +165,7 @@ function run_dash_app()
         return demo_opts, item_opts
     end
 
-    # Update table and heatmaps
+    # Update table and heatmaps dynamically
     Dash.callback!(app,
         Dash.Output("table-container", "children"),
         Dash.Output("binary-heatmap", "figure"),
@@ -179,30 +177,25 @@ function run_dash_app()
         selected_demos = isnothing(selected_demos) ? String[] : selected_demos
         selected_items = isnothing(selected_items) ? String[] : selected_items
 
-        if selected_model == "All Models"
-            df = vcat(values(all_models_data)...)
-            models_for_heatmap = collect(keys(all_models_data))
-        else
-            df = all_models_data[selected_model]
-            models_for_heatmap = [selected_model]
-        end
+        # Filter the table
+        df = selected_model == "All Models" ? vcat(values(all_models_data)...) :
+             all_models_data[selected_model]
+
+        models_for_heatmap = selected_model == "All Models" ? collect(keys(all_models_data)) :
+                             [selected_model]
 
         mask = trues(nrow(df))
 
-        if "__ALL__" in selected_demos
-            mask .&= trues(nrow(df))  # ignore demo filter
-        elseif !isempty(selected_demos)
+        if !("__ALL__" in selected_demos) && !isempty(selected_demos)
             mask .&= in.(df.demographic, Ref(selected_demos))
         end
-
-        if "__ALL__" in selected_items
-            mask .&= trues(nrow(df))  # ignore item filter
-        elseif !isempty(selected_items)
+        if !("__ALL__" in selected_items) && !isempty(selected_items)
             mask .&= in.(df.item_text, Ref(selected_items))
         end
 
         filtered = df[mask, :]
 
+        # Build table component
         table_component = Dash.html_table(
             vcat(
                 [Dash.html_tr([Dash.html_th(col) for col in names(filtered)])],
@@ -210,8 +203,9 @@ function run_dash_app()
             )
         )
 
+        # Build heatmaps from filtered data
         binary_fig = plotly_binary_heatmap(filtered, selected_model)
-        ability_fig = plotly_ability_heatmap(ALL_CHAINS_PATH; selected_demos=selected_demos, selected_models=models_for_heatmap)
+        ability_fig = plotly_ability_heatmap_from_df(filtered, models_for_heatmap)
 
         return table_component, binary_fig, ability_fig
     end

@@ -22,10 +22,13 @@ PromptingTools.OPENAI_API_KEY = ""
 const smallest_model = "gemma:2b"
 
 const default_models = [
+    "smollm2:135m",
     "gemma:2b",
     "phi3:latest",
     "mistral:latest",
-    "llama3:latest"
+    "llama3:latest",
+    # deepscaler:1.5b
+    "deepseek-r1:1.5b",
 ]
 
 const ollama_schema = PromptingTools.OllamaSchema()

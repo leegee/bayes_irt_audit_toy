@@ -1,3 +1,5 @@
+# A Toy in Julia for Psychometric Analysis of Bias in LLM
+
 An experimental toy to attempt an elementary audit of LLM bias by simulating scenarios with different demographic profiles and items.
 
 Results are analysed through Item Response Theory (IRT) using Turing.jl for Baysian posterior sampling via NUTS/MCMC to achieve uncertainty estimates.

@@ -1,6 +1,0 @@
-numpy 
-pymc 
-arviz
-ollama
-types-requests
-seaborn

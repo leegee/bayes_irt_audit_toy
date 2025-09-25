@@ -1,19 +1,23 @@
-#!/usr/bin/env julia 
+#!/usr/bin/env julia
 
 include("LLMBiasAudit.jl")
 import .LLMBiasAudit
 
 import CSV
-import DataFrames: DataFrame, Not, names, nrow, unstack
-import PlotlyJS
 import Dash
-import Logging: @error
+import DataFrames: DataFrame, names, nrow
 import FilePathsBase: mkpath
+import JLD2
+import Logging: @error
+import PlotlyJS
+import Statistics: mean
 
 const OUTPUT_BASE_DIR = "output"
 mkpath(OUTPUT_BASE_DIR)
 mkpath(joinpath(OUTPUT_BASE_DIR, "csv"))
 mkpath(joinpath(OUTPUT_BASE_DIR, "plots"))
+
+const ALL_CHAINS_PATH = joinpath(OUTPUT_BASE_DIR, "jld2", "irt_all_chains.jld2")
 
 safe_filename(model_name::String) = replace(model_name, r"[^\w]" => "_")
 
@@ -24,92 +28,143 @@ function load_model_csv(model_name::String; classified::Bool=true)
     file_path = joinpath(OUTPUT_BASE_DIR, "csv", file_name)
     if !isfile(file_path)
         @error "CSV file does not exist" file_path
-        return DataFrame()  # return empty DataFrame instead of failing
+        return DataFrame()
     end
     CSV.read(file_path, DataFrame)
 end
 
-# Create PlotlyJS heatmap figure
-function plotly_heatmap_figure(df::DataFrame, model_name::String)
-    if nrow(df) == 0
-        return PlotlyJS.Plot(PlotlyJS.Layout(title="No data"))
-    end
-
-    heatmap_df = unstack(df, :demographic, :item_text, :response_bin)
-    mat = Matrix{Union{Missing,Int}}(heatmap_df[:, Not(:demographic)])
-    mat = coalesce.(mat, 0)
-
-    hover_text = ["$(heatmap_df.demographic[i]), $(names(heatmap_df)[j+1]): $(mat[i,j])"
-                  for i in 1:size(mat, 1), j in 1:size(mat, 2)]
+# Fixed binary heatmap: long-format (only actual responses)
+function plotly_binary_heatmap(df::DataFrame, model_name::String)
+    hover_text = ["$(df.demographic[i]), $(df.item_text[i]): $(df.response_bin[i])" for i in 1:nrow(df)]
 
     trace = PlotlyJS.heatmap(
-        z=mat,
-        x=names(heatmap_df)[2:end],
-        y=heatmap_df.demographic,
+        z=df.response_bin,
+        x=df.item_text,
+        y=df.demographic,
         text=hover_text,
         hoverinfo="text+z",
-        colorscale="RdBu"
+        colorscale="RdBu",
+        zmin=0, zmax=1
     )
 
     PlotlyJS.Plot(trace, PlotlyJS.Layout(
-        title="Binary Classification Heatmap: $(model_name)",
-        template="plotly_dark"
+        title="Binary Responses: $(model_name)",
+        template="plotly_dark",
+        yaxis=PlotlyJS.attr(autorange="reversed")
     ))
 end
 
-# Run single Dash app for all models
-function run_dash_app_all_models(model_dfs::Dict{String,DataFrame})
+# Ability heatmap from JLD2
+function plotly_ability_heatmap(jld2_file; selected_demos=nothing, demo_names=nothing)
+    data = JLD2.load(jld2_file)
+    all_chains = data["all_chains"]
+    demographics = data["demographics"]
+    model_names = collect(keys(all_chains))
+    full_demo_names = demo_names === nothing ? [d.name for d in demographics] : demo_names
+    n_demo = length(full_demo_names)
+
+    # Map selected demographics to indexes
+    if selected_demos !== nothing && !isempty(selected_demos)
+        idxs = findall(d -> d in selected_demos, full_demo_names)
+        labels = full_demo_names[idxs]
+    else
+        idxs = 1:n_demo
+        labels = full_demo_names
+    end
+
+    heat_matrix = zeros(length(labels), length(model_names))
+    for (j, model_name) in enumerate(model_names)
+        df_chain = DataFrame(all_chains[model_name])
+        θ_cols = filter(c -> startswith(c, "θ"), names(df_chain))
+        θ_cols_filtered = θ_cols[idxs]
+        for (i, col) in enumerate(θ_cols_filtered)
+            heat_matrix[i, j] = mean(df_chain[!, col])
+        end
+    end
+
+    hover_text = ["$(labels[i]), $(model_names[j]): $(round(heat_matrix[i,j], digits=2))"
+                  for i in 1:length(labels), j in 1:length(model_names)]
+
+    trace = PlotlyJS.heatmap(
+        z=heat_matrix,
+        x=model_names,
+        y=labels,
+        text=hover_text,
+        hoverinfo="text+z",
+        colorscale="Viridis"
+    )
+
+    PlotlyJS.Plot(trace, PlotlyJS.Layout(
+        title="Mean abilities (θ) across models",
+        template="plotly_dark",
+        yaxis=PlotlyJS.attr(autorange="reversed")
+    ))
+end
+
+# Load all CSVs into a Dict
+function load_all_models()
+    Dict(model => load_model_csv(model) for model in LLMBiasAudit.default_models)
+end
+
+# Full Dash app
+function run_dash_app()
+    all_models_data = load_all_models()
+    model_names = collect(keys(all_models_data))
+
     app = Dash.dash()
 
     app.layout = Dash.html_div() do
         [
             Dash.dcc_dropdown(
-                id="model-selector",
-                options=[Dict("label" => m, "value" => m) for m in keys(model_dfs)],
-                value=first(keys(model_dfs)),
-                placeholder="Select Model"
+                id="model-filter",
+                options=[Dict("label" => m, "value" => m) for m in model_names],
+                value=first(model_names),
+                clearable=false,
+                placeholder="Select model"
             ),
             Dash.dcc_dropdown(
                 id="demo-filter",
-                options=[],  # updated dynamically
+                options=[],
                 multi=true,
-                placeholder="Select Demographics"
+                placeholder="Select demographics"
             ),
             Dash.dcc_dropdown(
                 id="item-filter",
-                options=[],  # updated dynamically
+                options=[],
                 multi=true,
-                placeholder="Select Items"
+                placeholder="Select items"
             ),
             Dash.html_div(id="table-container"),
-            Dash.dcc_graph(id="heatmap-graph")
+            Dash.dcc_graph(id="binary-heatmap"),
+            Dash.dcc_graph(id="ability-heatmap")
         ]
     end
 
-    # Update dropdown options when model changes
+    # Update demo/item dropdowns when model changes
     Dash.callback!(app,
         Dash.Output("demo-filter", "options"),
         Dash.Output("item-filter", "options"),
-        Dash.Input("model-selector", "value")
+        Dash.Input("model-filter", "value")
     ) do selected_model
-        df = model_dfs[selected_model]
+        df = all_models_data[selected_model]
         demo_opts = [Dict("label" => d, "value" => d) for d in unique(df.demographic)]
         item_opts = [Dict("label" => i, "value" => i) for i in unique(df.item_text)]
         return demo_opts, item_opts
     end
 
-    # Update table + heatmap when any filter changes
+    # Update table and heatmaps
     Dash.callback!(app,
         Dash.Output("table-container", "children"),
-        Dash.Output("heatmap-graph", "figure"),
-        Dash.Input("model-selector", "value"),
+        Dash.Output("binary-heatmap", "figure"),
+        Dash.Output("ability-heatmap", "figure"),
+        Dash.Input("model-filter", "value"),
         Dash.Input("demo-filter", "value"),
         Dash.Input("item-filter", "value")
     ) do selected_model, selected_demos, selected_items
-        df = model_dfs[selected_model]
-
         selected_demos = isnothing(selected_demos) ? String[] : selected_demos
         selected_items = isnothing(selected_items) ? String[] : selected_items
+
+        df = all_models_data[selected_model]
 
         mask = trues(nrow(df))
         if !isempty(selected_demos)
@@ -123,38 +178,17 @@ function run_dash_app_all_models(model_dfs::Dict{String,DataFrame})
         table_component = Dash.html_table(
             vcat(
                 [Dash.html_tr([Dash.html_th(col) for col in names(filtered)])],
-                [Dash.html_tr([Dash.html_td(filtered[row, col]) for col in names(filtered)])
-                 for row in 1:nrow(filtered)]
+                [Dash.html_tr([Dash.html_td(filtered[row, col]) for col in names(filtered)]) for row in 1:nrow(filtered)]
             )
         )
 
-        heatmap_fig = plotly_heatmap_figure(filtered, selected_model)
+        binary_fig = plotly_binary_heatmap(filtered, selected_model)
+        ability_fig = plotly_ability_heatmap(ALL_CHAINS_PATH; selected_demos=selected_demos)
 
-        return table_component, heatmap_fig
+        return table_component, binary_fig, ability_fig
     end
 
     Dash.run_server(app, "127.0.0.1"; debug=true)
 end
 
-# Main function
-function main(; classified::Bool=true)
-    model_dfs = Dict{String,DataFrame}()
-    for model in LLMBiasAudit.default_models
-        df = load_model_csv(model; classified=classified)
-        if nrow(df) > 0
-            model_dfs[model] = df
-        else
-            @error "Skipping model due to missing CSV" model
-        end
-    end
-
-    if isempty(model_dfs)
-        @error "No data available for any model."
-        return
-    end
-
-    println("Launching interactive Dash app for all models")
-    run_dash_app_all_models(model_dfs)
-end
-
-main()
+run_dash_app()

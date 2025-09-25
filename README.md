@@ -31,7 +31,7 @@ We model binary responses (sure/unsure) using the **Rasch model**, a 1-parameter
 
 ### Latent Variables
 
-- theta_i ~ N(0,1)  
+- 𝜃_i ~ N(0,1)  
   *Ability* of model i, assumed standard normal.
 
 - b_j ~ N(0,1)  
@@ -41,34 +41,34 @@ We model binary responses (sure/unsure) using the **Rasch model**, a 1-parameter
 
 For each model i = 1,…,N and item j = 1,…,J:
 
-P(Y_ij = 1 | theta_i, b_j) = f(theta_i - b_j)
+P(Y_ij = 1 | 𝜃_i, b_j) = f(𝜃_i - b_j)
 
 - Y_ij = observed response (1 = uncertain, 0 = certain)  
 - f(x) = logistic function: f(x) = 1 / (1 + exp(-x))
 
 Then:
 
-Y_ij ~ Bernoulli(P(Y_ij = 1 | theta_i, b_j))
+Y_ij ~ Bernoulli(P(Y_ij = 1 | 𝜃_i, b_j))
 
 ---
 
 ## Full Posterior
 
-Let theta = (theta_1, …, theta_N) and b = (b_1, …, b_J). The joint posterior over all abilities and item difficulties is:
+Let 𝜃 = (𝜃_1, …, 𝜃_N) and b = (b_1, …, b_J). The joint posterior over all abilities and item difficulties is:
 
-P(theta, b | Y) ∝ P(Y | theta, b) * P(theta) * P(b)
+P(𝜃, b | Y) ∝ P(Y | 𝜃, b) * P(𝜃) * P(b)
 
 Where:
 
-- P(Y | theta, b) = product over i=1..N, j=1..J of P(Y_ij | theta_i, b_j)  
-- P(theta) = product over i=1..N of N(theta_i | 0,1)  
+- P(Y | 𝜃, b) = product over i=1..N, j=1..J of P(Y_ij | 𝜃_i, b_j)  
+- P(𝜃) = product over i=1..N of N(𝜃_i | 0,1)  
 - P(b) = product over j=1..J of N(b_j | 0,1)
 
 ---
 
 ## Summary in Words
 
-1. Each model has a latent ability (theta_i) drawn from a standard normal.  
+1. Each model has a latent ability (𝜃_i) drawn from a standard normal.  
 1. Each item has a latent difficulty (b_j) drawn from a standard normal.  
 1. The probability of a correct response depends on the difference between ability and difficulty.  
 1. Observed responses Y_ij are Bernoulli with this probability.  
